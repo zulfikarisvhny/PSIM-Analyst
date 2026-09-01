@@ -7,6 +7,23 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 );
 
+// mv_players_complete occasionally times out on a cold query (common on
+// serverless — first request after idle hits a cold DB connection too).
+// Retrying instantly tends to hit the same still-cold state, so this backs
+// off briefly between attempts before giving up.
+async function withRetry(
+  run: () => PromiseLike<{ data: unknown; error: unknown }>,
+  attempts = 3,
+  delayMs = 400
+): Promise<{ data: unknown; error: unknown }> {
+  let result = await run();
+  for (let i = 1; i < attempts && result.error; i++) {
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    result = await run();
+  }
+  return result;
+}
+
 export interface NexusPlayerRow {
   player_master_id: number;
   player_name: string;
@@ -83,12 +100,9 @@ export function overallQualityScore(
 /** Fetch a team's current-squad player rows from mv_players_complete, deduped one row per player. */
 export async function fetchTeamPlayers(teamName: string): Promise<NexusPlayerRow[]> {
   const nexusTeam = NEXUS_TEAM_NAME[teamName] ?? teamName;
-  let { data, error } = await supabase.from("mv_players_complete").select("*").ilike("team", nexusTeam);
-  // mv_players_complete occasionally times out on a cold query — one retry
-  // is enough to ride out a transient hiccup rather than caching an empty result.
-  if (error) {
-    ({ data, error } = await supabase.from("mv_players_complete").select("*").ilike("team", nexusTeam));
-  }
+  const { data, error } = await withRetry(() =>
+    supabase.from("mv_players_complete").select("*").ilike("team", nexusTeam)
+  );
   if (error || !data) return [];
 
   // A handful of players have split rows (mid-season transfer/re-registration)
@@ -106,7 +120,9 @@ export async function fetchTeamPlayers(teamName: string): Promise<NexusPlayerRow
 /** Fetch specific players by exact name, regardless of team/league — for scouting new signees from other clubs. */
 export async function fetchPlayersByExactName(names: string[]): Promise<NexusPlayerRow[]> {
   if (names.length === 0) return [];
-  const { data, error } = await supabase.from("mv_players_complete").select("*").in("player_name", names);
+  const { data, error } = await withRetry(() =>
+    supabase.from("mv_players_complete").select("*").in("player_name", names)
+  );
   if (error || !data) return [];
 
   const byMaster = new Map<number, NexusPlayerRow>();
@@ -155,11 +171,13 @@ const AVERAGE_FIELDS: (keyof PositionAverages)[] = [
  * comparisons in the Player Stats overview.
  */
 export async function fetchLeaguePositionAverages(): Promise<Record<string, PositionAverages>> {
-  const { data, error } = await supabase
-    .from("mv_players_complete")
-    .select(["position_group", ...AVERAGE_FIELDS].join(","))
-    .eq("league", "indonesia 1")
-    .gte("minutes_played", 300);
+  const { data, error } = await withRetry(() =>
+    supabase
+      .from("mv_players_complete")
+      .select(["position_group", ...AVERAGE_FIELDS].join(","))
+      .eq("league", "indonesia 1")
+      .gte("minutes_played", 300)
+  );
   if (error || !data) return {};
 
   const byPos = new Map<string, Record<string, unknown>[]>();
@@ -266,12 +284,14 @@ export const PLAYER_PROFILE_FIELDS: (keyof Omit<PlayerProfileRow, "position_grou
  * not displayed row-by-row.
  */
 export async function fetchLeaguePlayerProfilePool(): Promise<PlayerProfileRow[]> {
-  const { data, error } = await supabase
-    .from("mv_players_complete")
-    .select(["position_group", ...PLAYER_PROFILE_FIELDS].join(","))
-    .eq("league", "indonesia 1")
-    .in("position_group", ["GK", "CB", "RB", "LB", "CM", "DM", "AM", "RW", "LW", "CF"])
-    .gte("minutes_played", 300);
+  const { data, error } = await withRetry(() =>
+    supabase
+      .from("mv_players_complete")
+      .select(["position_group", ...PLAYER_PROFILE_FIELDS].join(","))
+      .eq("league", "indonesia 1")
+      .in("position_group", ["GK", "CB", "RB", "LB", "CM", "DM", "AM", "RW", "LW", "CF"])
+      .gte("minutes_played", 300)
+  );
   if (error || !data) return [];
   return data as unknown as PlayerProfileRow[];
 }
