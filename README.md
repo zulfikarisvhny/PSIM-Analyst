@@ -1,6 +1,6 @@
 # Opponent Analyst
 
-Standalone scouting module, split out of `nexus-web`. Same Supabase project (BRI Super League data, `formation_lineups`/`formation_slot_positions` tables) — no auth gate, public by design (matches the current production behavior at `opponent-analyst.vercel.app`).
+Standalone scouting module, split out of Supabase project (BRI Super League data, `formation_lineups`/`formation_slot_positions` tables) — no auth gate, public by design (matches the current production behavior at `opponent-analyst.vercel.app`).
 
 ## Setup
 
