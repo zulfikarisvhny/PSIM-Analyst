@@ -21,7 +21,7 @@ interface TeamPassNetwork {
   edges: PassNetworkEdge[];
 }
 
-function TeamMatrix({ team, teamName }: { team: TeamPassNetwork; teamName: string }) {
+export function TeamMatrix({ team, teamName }: { team: TeamPassNetwork; teamName: string }) {
   if (team.players.length === 0) {
     return <p className="text-[11px] text-gray-500 dark:text-gray-400">No pass combination data for {teamName}.</p>;
   }

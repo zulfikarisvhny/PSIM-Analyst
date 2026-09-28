@@ -16,3 +16,5 @@ __pycache__/
 
 # Unrelated scaffold project accidentally left in this working directory
 /psim-intelligence-dashboard/
+.vercel
+.env*

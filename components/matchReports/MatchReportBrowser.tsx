@@ -2,7 +2,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { TimeSegmentChart } from "./TimeSegmentChart";
-import { PassCombinationMatrix } from "./PassCombinationMatrix";
+import { PassCombinationMatrix, TeamMatrix } from "./PassCombinationMatrix";
 import { PhysicalStatsTable } from "./PhysicalStatsTable";
 import { PitchLineup } from "./PitchLineup";
 import { AccuracyDonuts } from "./AccuracyDonuts";
@@ -129,6 +129,12 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
     count: TIME_SEGMENT_METRIC_KEYS.map(() => 0),
   }));
 
+  // PSIM-only across the season — the opponent side isn't aggregated since
+  // it's a different team's roster every match, so combining their player
+  // pairs wouldn't mean anything.
+  const passPlayers = new Map<number, PassNetworkPlayer>();
+  const passEdges = new Map<string, PassNetworkEdge>();
+
   for (const r of reports) {
     const isPsimHome = r.homeTeam === PSIM;
     const isPsimAway = r.awayTeam === PSIM;
@@ -168,9 +174,24 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
         });
       });
     }
+
+    if (r.passNetwork) {
+      const psimNet = isPsimHome ? r.passNetwork.home : r.passNetwork.away;
+      for (const p of psimNet.players) {
+        const existing = passPlayers.get(p.playerId);
+        if (existing) existing.totalPasses += p.totalPasses;
+        else passPlayers.set(p.playerId, { ...p });
+      }
+      for (const e of psimNet.edges) {
+        const key = `${e.fromPlayerId}-${e.toPlayerId}`;
+        const existing = passEdges.get(key);
+        if (existing) existing.passCount += e.passCount;
+        else passEdges.set(key, { ...e });
+      }
+    }
   }
 
-  const avg = (sum: number, count: number) => (count > 0 ? sum / count : null);
+  const avg = (sum: number, count: number) => (count > 0 ? Math.round((sum / count) * 100) / 100 : null);
   const psimSegments: TimeSegmentRow[] = SEGMENT_ORDER.map((seg, segIdx) => {
     const row: any = { segment: seg };
     TIME_SEGMENT_METRIC_KEYS.forEach((key, metricIdx) => {
@@ -192,6 +213,10 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
     xg: n > 0 ? { psim: psimXg / n, opp: oppXg / n } : null,
     possession: n > 0 ? { psim: psimPoss / n, opp: oppPoss / n } : null,
     timeSegments: { home: psimSegments, away: oppSegments },
+    passNetwork: {
+      players: [...passPlayers.values()].sort((a, b) => b.totalPasses - a.totalPasses),
+      edges: [...passEdges.values()],
+    } as TeamPassNetwork,
   };
 }
 
@@ -394,6 +419,7 @@ function TeamCrest({ url }: { url: string | null }) {
 
 export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }) {
   const [mode, setMode] = useState<"matchday" | "overall">("matchday");
+  const [overallTab, setOverallTab] = useState<"dynamics" | "passing">("dynamics");
   const [expandedMatchId, setExpandedMatchId] = useState<number | null>(null);
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<"facts" | "lineup" | "stats" | "attackTypes" | "dynamics" | "passing" | "physical">("facts");
@@ -459,9 +485,32 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
           <ComparisonRow label="Goals / Match" homeRaw={aggregate.goals?.psim.toFixed(2)} awayRaw={aggregate.goals?.opp.toFixed(2)} />
           <ComparisonRow label="xG / Match" homeRaw={aggregate.xg?.psim.toFixed(2)} awayRaw={aggregate.xg?.opp.toFixed(2)} />
           <ComparisonRow label="Possession %" homeRaw={aggregate.possession?.psim.toFixed(1)} awayRaw={aggregate.possession?.opp.toFixed(1)} />
-          <div className="border-t border-gray-200 dark:border-[#2a2b30] my-3" />
-          <h4 className="text-xs font-bold text-gray-900 dark:text-white mb-2">Match Dynamics — Season Average</h4>
-          <TimeSegmentChart homeTeam="PSIM average" awayTeam="Opponents average" home={aggregate.timeSegments.home} away={aggregate.timeSegments.away} />
+
+          <div className="flex items-center gap-4 mt-4 mb-3 border-b border-gray-100 dark:border-[#2a2b30] text-xs font-semibold">
+            {(
+              [
+                ["dynamics", "Match Dynamics"],
+                ["passing", "Pass Combinations"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setOverallTab(key)}
+                className={`pb-2.5 border-b-2 -mb-px ${
+                  overallTab === key
+                    ? "border-blue-600 dark:border-[#ffcf4d] text-gray-900 dark:text-white"
+                    : "border-transparent text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {overallTab === "dynamics" && (
+            <TimeSegmentChart homeTeam="PSIM average" awayTeam="Opponents average" home={aggregate.timeSegments.home} away={aggregate.timeSegments.away} />
+          )}
+          {overallTab === "passing" && <TeamMatrix team={aggregate.passNetwork} teamName="PSIM Yogyakarta" />}
         </div>
       )}
 
