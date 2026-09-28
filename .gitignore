@@ -1,7 +1,18 @@
 node_modules
 .next
 .env.local
+.env
+extract-PDF/.env
 .DS_Store
 .claude
 *.tsbuildinfo
 nexus-player-comparison*
+
+# Opponent scouting PDFs / match reports — competitive data, kept local only (repo is public)
+/*.pdf
+extract-PDF/*.pdf
+extract-PDF/*.sql
+__pycache__/
+
+# Unrelated scaffold project accidentally left in this working directory
+/psim-intelligence-dashboard/

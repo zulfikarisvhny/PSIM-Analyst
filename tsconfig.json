@@ -19,5 +19,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules", "nexus-player-comparison 2"]
+  "exclude": ["node_modules", "nexus-player-comparison 2", "psim-intelligence-dashboard"]
 }

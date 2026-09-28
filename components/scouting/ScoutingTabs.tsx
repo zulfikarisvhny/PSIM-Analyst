@@ -16,6 +16,9 @@ import { HeadToHead } from "./HeadToHead";
 import { FormationPitchCard } from "./FormationPitch";
 import { FormationMatrix } from "./FormationMatrix";
 import { AveragePosition } from "./AveragePosition";
+import { TacticsBoard } from "./TacticsBoard";
+import { PassNetwork } from "./PassNetwork";
+import { PASS_NETWORK_BY_TEAM } from "@/lib/scouting/passNetwork";
 import { AttackingQuality } from "./AttackingQuality";
 import { PlayerStats } from "./PlayerStats";
 import { SquadUpdate } from "./SquadUpdate";
@@ -24,6 +27,7 @@ import { DepartedPlayers } from "./DepartedPlayers";
 import { TacticalNotes } from "./TacticalNotes";
 import { MatchByMatch } from "./MatchByMatch";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 
 export function ScoutingTabs({
   rows,
@@ -63,6 +67,8 @@ export function ScoutingTabs({
   const [activeTab, setActiveTab] = useState("overview");
   const router = useRouter();
 
+  const passNetworkMatches = PASS_NETWORK_BY_TEAM[focusTeam];
+
   const TABS = [
     { id: "overview", label: "Overview", active: true },
     { id: "table", label: "Table", active: true },
@@ -70,6 +76,8 @@ export function ScoutingTabs({
     { id: "stylemap", label: "Style Map", active: true },
     { id: "formation", label: "Formation Analysis", active: hasMatchLog },
     { id: "avgpos", label: "Average Position", active: hasMatchLog },
+    { id: "passnetwork", label: "Passing Network", active: !!passNetworkMatches },
+    { id: "tacticsboard", label: "Tactics Board", active: true },
     { id: "matchstats", label: "Match-by-Match", active: hasMatchLog },
     { id: "attack", label: "Attack", active: true },
     { id: "squad", label: "Squad Update", active: hasNewSignees },
@@ -119,6 +127,7 @@ export function ScoutingTabs({
                 </option>
               ))}
             </select>
+            <LogoutButton />
             <ThemeToggle />
           </div>
         </div>
@@ -192,6 +201,14 @@ export function ScoutingTabs({
 
         {activeTab === "avgpos" && hasMatchLog && (
           <AveragePosition teamName={focusTeam} logoUrl={focusRow?.logo_url} />
+        )}
+
+        {activeTab === "passnetwork" && passNetworkMatches && (
+          <PassNetwork teamName={focusTeam} matches={passNetworkMatches} />
+        )}
+
+        {activeTab === "tacticsboard" && (
+          <TacticsBoard teamName={focusTeam} players={players} />
         )}
 
         {activeTab === "matchstats" && hasMatchLog && (

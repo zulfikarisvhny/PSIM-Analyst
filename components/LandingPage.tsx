@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import { LeagueTeamRow } from "@/lib/scouting/types";
 import { MATCH_LOG_BY_TEAM } from "@/lib/scouting/matchlog";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { LogoutButton } from "@/components/auth/LogoutButton";
 import styles from "./LandingPage.module.css";
 
 type Club = {
@@ -53,7 +54,7 @@ export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; bra
     [rows]
   );
 
-  const defaultSelected = Math.max(0, clubs.findIndex((c) => c.team.Team === "Persita Tangerang"));
+  const defaultSelected = Math.max(0, clubs.findIndex((c) => c.team.Team === "PSIM Yogyakarta"));
   const [selected, setSelected] = useState(defaultSelected);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<"carousel" | "directory">("carousel");
@@ -76,12 +77,14 @@ export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; bra
       <nav className={styles.nav}>
         <Link href="/" className={styles.brand}>
           {brandLogoUrl && <img src={brandLogoUrl} alt="" className={styles.brandCrest} />}
-          <b>PSIM Dashboard</b>
+          <b>PSIM Intelligence Dashboard</b>
         </Link>
         <div className={styles.navLinks}>
-          <a className={styles.active}>Opponent Analyst</a>
+          <Link href="/">← PSIM Overview</Link>
+          <a className={styles.active}>Opponent Analysis</a>
         </div>
         <div className={styles.navRight}>
+          <LogoutButton />
           <ThemeToggle />
         </div>
       </nav>
@@ -90,8 +93,8 @@ export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; bra
         <div className={styles.heroTop}>
           <div>
             <span className={styles.eyebrow}>MATCH INTELLIGENCE</span>
-            <h1>Opponent Analyst</h1>
-            <p>Select an opponent and turn its match data into a clear preparation report.</p>
+            <h1>PSIM Intelligence Dashboard</h1>
+            <p>PSIM Yogyakarta&apos;s home for squad and match data — plus opponent reports for every club in the league.</p>
           </div>
           <div className={styles.modeSwitch}>
             <button onClick={() => setView("carousel")} className={view === "carousel" ? styles.selectedMode : ""}>
@@ -118,7 +121,7 @@ export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; bra
                   <Crest club={club} large={offset === 0} />
                   {offset === 0 ? (
                     <div className={styles.activeClub}>
-                      <span>SELECTED OPPONENT</span>
+                      <span>{club.team.Team === "PSIM Yogyakarta" ? "YOUR CLUB" : "SELECTED OPPONENT"}</span>
                       <h2>{club.team.Team}</h2>
                       <p>BRI Super League</p>
                     </div>
@@ -160,7 +163,7 @@ export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; bra
                 )}
               </div>
               <Link href={`/scouting/${encodeURIComponent(active.team.Team)}`} className={styles.reportButton}>
-                Open scouting report <span>↗</span>
+                {active.team.Team === "PSIM Yogyakarta" ? "Open PSIM dashboard" : "Open scouting report"} <span>↗</span>
               </Link>
             </div>
           </>

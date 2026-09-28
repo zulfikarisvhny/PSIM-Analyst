@@ -25,6 +25,7 @@ export const TEAM_SHORT_TO_FULL: Record<string, string> = {
   "Semen Padang": "Semen Padang FC",
   Persijap: "Persijap Jepara",
   Persita: "Persita Tangerang",
+  PSS: "PSS Sleman",
   "Bali Utd": "Bali United FC",
   PSIM: "PSIM Yogyakarta",
   Persebaya: "Persebaya Surabaya",
@@ -39,6 +40,7 @@ export const TEAM_SHORT_TO_FULL: Record<string, string> = {
 export const OWN_SHORT_BY_TEAM: Record<string, string> = {
   "Bhayangkara Presisi FC": "Bhayangkara",
   "Persita Tangerang": "Persita",
+  "Madura United FC": "Madura Utd",
 };
 
 // Transcribed from "Match Log Formation Bhayangkara FC.csv". Round 30 (vs
@@ -124,9 +126,18 @@ const PERSITA_MATCH_LOG: MatchLogEntry[] = [
   { round: 34, homeShort: "Persita", awayShort: "Persis", homeScore: 1, awayScore: 3, teamFormation: "4-2-3-1", oppFormation: "4-4-2", result: "L" },
 ];
 
+// Transcribed from Lapangbola match report PDFs. Formations aren't printed
+// as a labeled string in those reports (only the on-pitch dot layout), so
+// left blank for now rather than guessed.
+const MADURA_MATCH_LOG: MatchLogEntry[] = [
+  { round: 1, homeShort: "Madura Utd", awayShort: "Persijap", homeScore: 2, awayScore: 0, teamFormation: "", oppFormation: "", result: "W" },
+  { round: 2, homeShort: "PSS", awayShort: "Madura Utd", homeScore: 1, awayScore: 3, teamFormation: "", oppFormation: "", result: "W" },
+];
+
 export const MATCH_LOG_BY_TEAM: Record<string, MatchLogEntry[]> = {
   "Bhayangkara Presisi FC": BHAYANGKARA_MATCH_LOG,
   "Persita Tangerang": PERSITA_MATCH_LOG,
+  "Madura United FC": MADURA_MATCH_LOG,
 };
 
 export function opponentOf(

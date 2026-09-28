@@ -1,0 +1,422 @@
+.landingPage {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow: hidden;
+  color: #fff;
+  background: linear-gradient(118deg, #214a9f 0%, #2d5ab8 48%, #163878 100%);
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.blueField {
+  position: absolute;
+  z-index: -4;
+  inset: 0;
+  background: radial-gradient(circle at 21% 72%, rgba(71, 119, 216, 0.8), transparent 42%),
+    linear-gradient(115deg, #214b9d, #315db8 55%, #102a62);
+}
+.navySlice {
+  position: absolute;
+  z-index: -3;
+  top: -35%;
+  right: 11%;
+  width: 33%;
+  height: 165%;
+  background: rgba(5, 28, 72, 0.75);
+  transform: skewX(-18deg);
+  box-shadow: -30px 0 80px rgba(3, 21, 56, 0.18);
+}
+.grain {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  opacity: 0.14;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.28'/%3E%3C/svg%3E");
+}
+.topbar {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 34px clamp(28px, 5vw, 78px);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  text-decoration: none;
+  letter-spacing: 0.09em;
+}
+.brandIcon {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border: 1px solid rgba(255, 255, 255, 0.55);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+}
+.brand strong,
+.brand small {
+  display: block;
+}
+.brand strong {
+  font-size: 1rem;
+}
+.brand small {
+  font-size: 0.65rem;
+  letter-spacing: 0.22em;
+  opacity: 0.7;
+  margin-top: 2px;
+}
+.portalLabel {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.62);
+}
+.heroCopy {
+  position: relative;
+  z-index: 5;
+  width: min(48vw, 690px);
+  margin: clamp(80px, 14vh, 160px) 0 110px clamp(28px, 8vw, 130px);
+}
+.heroKicker {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  color: #bfd2ff;
+  margin-bottom: 22px;
+}
+.heroCopy h1 {
+  font-size: clamp(3.5rem, 6.1vw, 6.7rem);
+  font-weight: 600;
+  line-height: 0.9;
+  letter-spacing: -0.062em;
+  margin: 0;
+  max-width: 780px;
+}
+.heroCopy h1 em {
+  font-style: normal;
+  color: #aecaff;
+}
+.heroCopy p {
+  font-size: clamp(1rem, 1.35vw, 1.28rem);
+  line-height: 1.6;
+  max-width: 570px;
+  color: rgba(255, 255, 255, 0.74);
+  margin: 30px 0 34px;
+}
+.loginTrigger {
+  min-width: 172px;
+  height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 999px;
+  background: #fff;
+  color: #193a80;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 18px 42px rgba(3, 20, 55, 0.24);
+  transition: 0.25s;
+}
+.loginTrigger:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 48px rgba(3, 20, 55, 0.34);
+}
+.players {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: -5vh;
+  width: 58%;
+  height: 94vh;
+  overflow: hidden;
+  pointer-events: none;
+}
+.player {
+  position: absolute;
+}
+.player :global(img) {
+  object-fit: contain;
+  object-position: center bottom;
+  filter: saturate(0.97) contrast(1.03) drop-shadow(0 26px 40px rgba(1, 15, 43, 0.26));
+}
+.playerBack {
+  left: -1%;
+  width: 62%;
+  height: 122%;
+  bottom: -26%;
+  opacity: 1;
+  z-index: 1;
+}
+.playerFront {
+  left: 21%;
+  width: 70%;
+  height: 138%;
+  bottom: -33%;
+  z-index: 2;
+}
+.landingFooter {
+  position: absolute;
+  z-index: 6;
+  left: clamp(28px, 5vw, 78px);
+  right: clamp(28px, 5vw, 78px);
+  bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  font-weight: 700;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(5, 17, 43, 0.68);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.loginModal {
+  position: relative;
+  width: min(470px, calc(100vw - 32px));
+  border: 1px solid rgba(213, 220, 232, 0.9);
+  border-radius: 22px;
+  padding: 34px;
+  background: rgba(255, 255, 255, 0.98);
+  color: #121b2d;
+  box-shadow: 0 34px 100px rgba(2, 14, 42, 0.38);
+  font-family: var(--font-poppins), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+.closeButton {
+  position: absolute;
+  top: 19px;
+  right: 19px;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: #526075;
+}
+.closeButton:hover {
+  background: #eef2f8;
+}
+.secureLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: #3159ae;
+  background: #edf3ff;
+  font-size: 0.75rem;
+  font-weight: 750;
+  margin-bottom: 21px;
+}
+.modalTitle {
+  font-size: 2.25rem;
+  line-height: 1.08;
+  letter-spacing: -0.04em;
+  margin: 0;
+}
+.modalDescription {
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: #6d7688;
+  margin: 9px 0 27px;
+}
+.loginModal form label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 750;
+  margin: 0 0 8px;
+}
+.passwordRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 20px;
+}
+.passwordRow label {
+  margin: 0 0 8px !important;
+}
+.textButton {
+  border: 0;
+  background: none;
+  color: #3159ae;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 0 0 8px;
+}
+.inputWrap {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid #dfe4ec;
+  border-radius: 11px;
+  padding: 0 14px;
+  color: #8892a4;
+  background: #fff;
+  transition: 0.2s;
+}
+.inputWrap:focus-within {
+  border-color: #4e72c3;
+  box-shadow: 0 0 0 4px rgba(49, 89, 174, 0.1);
+}
+.inputWrap input {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  color: #121b2d;
+  background: transparent;
+  font-size: 0.95rem;
+  font-family: inherit;
+}
+.inputWrap input::placeholder {
+  color: #a2aaba;
+}
+.iconButton {
+  border: 0;
+  background: transparent;
+  color: #727c8e;
+  padding: 6px;
+  display: grid;
+  place-items: center;
+}
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 17px 0 0;
+  color: #5e687a;
+  font-weight: 550;
+  font-size: 0.85rem;
+}
+.remember input {
+  width: 16px;
+  height: 16px;
+  accent-color: #3159ae;
+}
+.formError {
+  color: #bd2533;
+  background: #fff0f1;
+  padding: 10px 12px;
+  border-radius: 9px;
+  font-size: 0.8rem;
+  margin: 14px 0 0;
+}
+.submitButton {
+  width: 100%;
+  min-height: 52px;
+  border: 0;
+  border-radius: 11px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 9px;
+  margin-top: 22px;
+  background: #3159ae;
+  color: #fff;
+  font-weight: 800;
+  font-size: 0.95rem;
+  box-shadow: 0 10px 25px rgba(49, 89, 174, 0.22);
+  transition: 0.2s;
+}
+.submitButton:hover {
+  background: #234a9f;
+  transform: translateY(-1px);
+}
+.submitButton:disabled {
+  opacity: 0.6;
+  transform: none;
+}
+.inviteCopy {
+  margin: 21px 0 0;
+  text-align: center;
+  color: #929aaa;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 950px) {
+  .players {
+    right: -16%;
+    width: 78%;
+    opacity: 0.75;
+  }
+  .heroCopy {
+    width: 65vw;
+  }
+  .portalLabel {
+    display: none;
+  }
+}
+@media (max-width: 700px) {
+  .landingPage {
+    min-height: 100svh;
+  }
+  .navySlice {
+    right: -55%;
+    width: 95%;
+  }
+  .topbar {
+    padding: 22px;
+  }
+  .heroCopy {
+    width: auto;
+    margin: 10vh 22px 100px;
+  }
+  .heroCopy h1 {
+    font-size: clamp(3rem, 14vw, 5rem);
+  }
+  .heroCopy p {
+    max-width: 90%;
+    font-size: 1rem;
+  }
+  .players {
+    right: -35%;
+    width: 105%;
+    height: 61vh;
+    opacity: 0.46;
+  }
+  .playerBack {
+    display: none;
+  }
+  .playerFront {
+    width: 100%;
+    height: 100%;
+  }
+  .landingFooter {
+    left: 22px;
+    right: 22px;
+    bottom: 18px;
+  }
+  .landingFooter span:last-child {
+    display: none;
+  }
+  .loginModal {
+    padding: 28px 22px;
+  }
+  .modalTitle {
+    font-size: 1.9rem;
+  }
+}
