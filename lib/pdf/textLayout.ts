@@ -34,3 +34,21 @@ export function groupRows(items: TextItem[], tolerance = 2): TextItem[][] {
   }
   return rows.sort((a, b) => b.y - a.y).map((r) => r.items.sort((a, b) => a.x - b.x));
 }
+
+/**
+ * Wyscout's PDF export double-paints some text a pixel or two apart (bold
+ * emphasis on certain rows — seen on pass-grid totals and Shots-page rows
+ * alike, not tied to the value itself). Drops any item within `thresholdPx`
+ * of the previously *kept* item once sorted by x, rather than a fixed
+ * rounding grid, since a rounding boundary can fall inside a genuine
+ * duplicate's tiny spread and wrongly split it into two "clusters".
+ */
+export function dedupeNearby<T extends { x: number }>(items: T[], thresholdPx = 3): T[] {
+  const sorted = [...items].sort((a, b) => a.x - b.x);
+  const out: T[] = [];
+  for (const it of sorted) {
+    if (out.length > 0 && it.x - out[out.length - 1].x <= thresholdPx) continue;
+    out.push(it);
+  }
+  return out;
+}

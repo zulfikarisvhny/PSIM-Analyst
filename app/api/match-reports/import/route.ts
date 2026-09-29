@@ -23,6 +23,8 @@ interface FileResult {
   passPlayersSkipped?: number;
   eventsInserted?: number;
   lineupsInserted?: number;
+  eventLocationsInserted?: number;
+  formationLineupsInserted?: number;
 }
 
 export async function POST(request: Request) {
@@ -45,7 +47,16 @@ export async function POST(request: Request) {
 
   for (const report of reports) {
     try {
-      const { matchStatus, matchLabel, passCombinationsInserted, passPlayersSkipped, eventsInserted, lineupsInserted } = await insertMatchReport(
+      const {
+        matchStatus,
+        matchLabel,
+        passCombinationsInserted,
+        passPlayersSkipped,
+        eventsInserted,
+        lineupsInserted,
+        eventLocationsInserted,
+        formationLineupsInserted,
+      } = await insertMatchReport(
         {
           meta: report.meta,
           teamStatsHome: report.teamStatsHome,
@@ -57,6 +68,14 @@ export async function POST(request: Request) {
           passCombinationsAway: report.passCombinationsAway,
           matchEvents: report.matchEvents,
           startingLineups: report.startingLineups,
+          averagePositions: report.averagePositions,
+          shots: report.shots,
+          losses: report.losses,
+          recoveries: report.recoveries,
+          keyPasses: report.keyPasses,
+          crosses: report.crosses,
+          startingFormationLineup: report.startingFormationLineup,
+          finalFormationLineup: report.finalFormationLineup,
         },
         admin
       );
@@ -71,6 +90,8 @@ export async function POST(request: Request) {
         passPlayersSkipped,
         eventsInserted,
         lineupsInserted,
+        eventLocationsInserted,
+        formationLineupsInserted,
       });
     } catch (err) {
       results.push({ fileName: report.fileName, ok: false, error: err instanceof Error ? err.message : String(err) });

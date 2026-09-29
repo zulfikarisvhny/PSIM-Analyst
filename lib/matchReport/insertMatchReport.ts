@@ -7,6 +7,10 @@ import type { ExtractedMatchReport } from "./parseMatchReport";
 import type { MatchEvent, StartingPlayer } from "./parseMatchEvents";
 import type { TimeSegmentMetric } from "./parseTimeSegments";
 import type { TeamPassSummary } from "./parsePassCombinations";
+import type { AveragePosition } from "./parseAveragePositions";
+import type { ShotEvent } from "./parseShots";
+import type { ScatterEvent } from "./parseEventScatterPage";
+import type { FormationSlot } from "./parseFormationLineups";
 import { matchPlayerName, type PlayerOption } from "../physicalStats/matchPlayerName";
 
 function parseNumber(v: string | undefined): number | null {
@@ -55,7 +59,7 @@ function buildTimeSegmentRows(matchId: string, clubId: string, metrics: TimeSegm
 async function insertPassCombinations(
   supabase: SupabaseClient,
   matchId: string,
-  sides: { clubId: string; summary: TeamPassSummary }[]
+  sides: { clubId: string; summary: TeamPassSummary; averagePositions: AveragePosition[] }[]
 ): Promise<{ combinationsInserted: number; playersSkipped: number }> {
   const { error: delCombosErr } = await supabase.from("match_pass_combinations").delete().eq("match_id", matchId);
   if (delCombosErr) throw new Error(`match_pass_combinations delete failed: ${delCombosErr.message}`);
@@ -66,10 +70,12 @@ async function insertPassCombinations(
   const summaryRows: Record<string, unknown>[] = [];
   let playersSkipped = 0;
 
-  for (const { clubId, summary } of sides) {
+  for (const { clubId, summary, averagePositions } of sides) {
     const { data: roster, error: rosterErr } = await supabase.from("players").select("id, name").eq("club_id", clubId);
     if (rosterErr) throw new Error(`players lookup failed for club ${clubId}: ${rosterErr.message}`);
     const rosterOptions: PlayerOption[] = (roster ?? []).map((p: { id: string; name: string }) => ({ id: Number(p.id), name: p.name }));
+
+    const positionByJersey = new Map(averagePositions.map((p) => [p.jersey, p]));
 
     const playerIdByJersey = new Map<number, string>();
     for (const player of summary.players) {
@@ -84,6 +90,7 @@ async function insertPassCombinations(
     for (const player of summary.players) {
       const playerId = playerIdByJersey.get(player.jersey);
       if (!playerId) continue; // already counted above
+      const pos = positionByJersey.get(player.jersey);
       summaryRows.push({
         match_id: matchId,
         player_id: playerId,
@@ -91,6 +98,9 @@ async function insertPassCombinations(
         def_third_pct: summary.thirds?.def ?? null,
         mid_third_pct: summary.thirds?.mid ?? null,
         final_third_pct: summary.thirds?.final ?? null,
+        x_pct: pos?.xPct ?? null,
+        y_pct: pos?.yPct ?? null,
+        jersey_number: player.jersey,
       });
     }
 
@@ -194,6 +204,141 @@ async function insertStartingLineups(
   return rows.length;
 }
 
+async function fetchRoster(supabase: SupabaseClient, clubId: string): Promise<PlayerOption[]> {
+  const { data: roster, error } = await supabase.from("players").select("id, name").eq("club_id", clubId);
+  if (error) throw new Error(`players lookup failed for club ${clubId}: ${error.message}`);
+  return (roster ?? []).map((p: { id: string; name: string }) => ({ id: Number(p.id), name: p.name }));
+}
+
+/**
+ * Inserts every located event (shots, losses, recoveries, key passes,
+ * crosses) into the single match_event_locations table. Shots already carry
+ * their own player name (read straight off the Shots page's table); the
+ * other four kinds only have a jersey number next to each dot, so those are
+ * resolved through `jerseyToName` (built from the Passes page's player list,
+ * which covers subs too, unlike the starting lineup). A jersey that can't be
+ * named, or a name matchPlayerName can't confidently resolve to a roster
+ * player, is still inserted — with a "#<jersey>" placeholder and a null
+ * player_id — rather than silently dropped, since the dot is still real
+ * location data even without a confirmed identity.
+ */
+async function insertEventLocations(
+  supabase: SupabaseClient,
+  matchId: string,
+  sides: {
+    clubId: string;
+    jerseyToName: Map<number, string>;
+    shots: ShotEvent[];
+    losses: ScatterEvent[];
+    recoveries: ScatterEvent[];
+    keyPasses: ScatterEvent[];
+    crosses: ScatterEvent[];
+  }[]
+): Promise<number> {
+  const { error: delErr } = await supabase.from("match_event_locations").delete().eq("match_id", matchId);
+  if (delErr) throw new Error(`match_event_locations delete failed: ${delErr.message}`);
+
+  const rows: Record<string, unknown>[] = [];
+  for (const side of sides) {
+    const hasAny = side.shots.length + side.losses.length + side.recoveries.length + side.keyPasses.length + side.crosses.length > 0;
+    if (!hasAny) continue;
+    const roster = await fetchRoster(supabase, side.clubId);
+
+    for (const s of side.shots) {
+      // Prefer the Passes-page jersey->name map over the Shots table's own
+      // name text: a handful of rows double-paint their name in a way that
+      // can't be cleanly reconstructed (see parseShots.ts), and jersey
+      // number is unaffected on every sample row seen so far.
+      const name = side.jerseyToName.get(s.jersey) ?? s.player;
+      const match = matchPlayerName(name, roster);
+      rows.push({
+        match_id: matchId,
+        club_id: side.clubId,
+        player_id: match.playerId !== null ? String(match.playerId) : null,
+        player_name_raw: name,
+        jersey_number: s.jersey,
+        kind: "shot",
+        minute: s.minute,
+        shot_type: s.shotType,
+        outcome: s.outcome,
+        xg: s.xg,
+        psxg: s.psxg,
+        x_pct: s.xPct,
+        y_pct: s.yPct,
+      });
+    }
+
+    function resolveScatter(kind: "loss" | "recovery" | "key_pass" | "cross", events: ScatterEvent[]) {
+      for (const e of events) {
+        const name = side.jerseyToName.get(e.jersey) ?? null;
+        const match = name ? matchPlayerName(name, roster) : { playerId: null };
+        rows.push({
+          match_id: matchId,
+          club_id: side.clubId,
+          player_id: match.playerId !== null ? String(match.playerId) : null,
+          player_name_raw: name ?? `#${e.jersey}`,
+          jersey_number: e.jersey,
+          kind,
+          half: e.half,
+          leads_to_shot: e.leadsToShot ?? null,
+          x_pct: e.xPct,
+          y_pct: e.yPct,
+        });
+      }
+    }
+    resolveScatter("loss", side.losses);
+    resolveScatter("recovery", side.recoveries);
+    resolveScatter("key_pass", side.keyPasses);
+    resolveScatter("cross", side.crosses);
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supabase.from("match_event_locations").insert(rows);
+    if (error) throw new Error(`match_event_locations insert failed: ${error.message}`);
+  }
+  return rows.length;
+}
+
+/** Inserts the two resolved formation-phase lineups (starting, final) per side — real slot positions from the POSITIONS page's own diagrams. */
+async function insertFormationLineups(
+  supabase: SupabaseClient,
+  matchId: string,
+  sides: { clubId: string; starting: FormationSlot[]; final: FormationSlot[] }[]
+): Promise<number> {
+  const { error: delErr } = await supabase.from("match_formation_lineups").delete().eq("match_id", matchId);
+  if (delErr) throw new Error(`match_formation_lineups delete failed: ${delErr.message}`);
+
+  const rows: Record<string, unknown>[] = [];
+  for (const side of sides) {
+    if (side.starting.length === 0 && side.final.length === 0) continue;
+    const roster = await fetchRoster(supabase, side.clubId);
+
+    function pushPhase(phase: "starting" | "final", slots: FormationSlot[]) {
+      for (const s of slots) {
+        const match = matchPlayerName(s.name, roster);
+        rows.push({
+          match_id: matchId,
+          club_id: side.clubId,
+          player_id: match.playerId !== null ? String(match.playerId) : null,
+          player_name_raw: s.name,
+          jersey_number: s.jersey,
+          phase,
+          x_pct: s.xPct,
+          y_pct: s.yPct,
+        });
+      }
+    }
+    pushPhase("starting", side.starting);
+    pushPhase("final", side.final);
+  }
+
+  if (rows.length > 0) {
+    const { error } = await supabase.from("match_formation_lineups").insert(rows);
+    if (error) throw new Error(`match_formation_lineups insert failed: ${error.message}`);
+  }
+  return rows.length;
+}
+
 export async function insertMatchReport(data: ExtractedMatchReport, supabase: SupabaseClient) {
   const { meta } = data;
   const { homeTeam, awayTeam, matchDateIso } = meta;
@@ -282,9 +427,13 @@ export async function insertMatchReport(data: ExtractedMatchReport, supabase: Su
   let passCombinationsInserted = 0;
   let passPlayersSkipped = 0;
   const passSides = [
-    data.passCombinationsHome ? { clubId: homeId, summary: data.passCombinationsHome } : null,
-    data.passCombinationsAway ? { clubId: awayId, summary: data.passCombinationsAway } : null,
-  ].filter((s): s is { clubId: string; summary: NonNullable<typeof data.passCombinationsHome> } => s !== null);
+    data.passCombinationsHome
+      ? { clubId: homeId, summary: data.passCombinationsHome, averagePositions: data.averagePositions?.home ?? [] }
+      : null,
+    data.passCombinationsAway
+      ? { clubId: awayId, summary: data.passCombinationsAway, averagePositions: data.averagePositions?.away ?? [] }
+      : null,
+  ].filter((s): s is { clubId: string; summary: NonNullable<typeof data.passCombinationsHome>; averagePositions: AveragePosition[] } => s !== null);
   if (passSides.length > 0) {
     const result = await insertPassCombinations(supabase, matchId, passSides);
     passCombinationsInserted = result.combinationsInserted;
@@ -301,5 +450,44 @@ export async function insertMatchReport(data: ExtractedMatchReport, supabase: Su
     { clubId: awayId, players: data.startingLineups?.away ?? [] },
   ]);
 
-  return { matchId, matchStatus, homeTeam, awayTeam, matchLabel, passCombinationsInserted, passPlayersSkipped, eventsInserted, lineupsInserted };
+  const jerseyToName = (players: TeamPassSummary | null) => new Map((players?.players ?? []).map((p) => [p.jersey, p.name]));
+  const eventLocationsInserted = await insertEventLocations(supabase, matchId, [
+    {
+      clubId: homeId,
+      jerseyToName: jerseyToName(data.passCombinationsHome),
+      shots: data.shots?.home ?? [],
+      losses: data.losses?.home ?? [],
+      recoveries: data.recoveries?.home ?? [],
+      keyPasses: data.keyPasses?.home ?? [],
+      crosses: data.crosses?.home ?? [],
+    },
+    {
+      clubId: awayId,
+      jerseyToName: jerseyToName(data.passCombinationsAway),
+      shots: data.shots?.away ?? [],
+      losses: data.losses?.away ?? [],
+      recoveries: data.recoveries?.away ?? [],
+      keyPasses: data.keyPasses?.away ?? [],
+      crosses: data.crosses?.away ?? [],
+    },
+  ]);
+
+  const formationLineupsInserted = await insertFormationLineups(supabase, matchId, [
+    { clubId: homeId, starting: data.startingFormationLineup?.home ?? [], final: data.finalFormationLineup?.home ?? [] },
+    { clubId: awayId, starting: data.startingFormationLineup?.away ?? [], final: data.finalFormationLineup?.away ?? [] },
+  ]);
+
+  return {
+    matchId,
+    matchStatus,
+    homeTeam,
+    awayTeam,
+    matchLabel,
+    passCombinationsInserted,
+    passPlayersSkipped,
+    eventsInserted,
+    lineupsInserted,
+    eventLocationsInserted,
+    formationLineupsInserted,
+  };
 }

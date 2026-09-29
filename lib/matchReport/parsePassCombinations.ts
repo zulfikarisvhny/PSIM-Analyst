@@ -9,7 +9,7 @@
 // first player row, and grid cells line up with those header x-positions —
 // same "bucket by nearest known x" technique used for the time-segment
 // charts, just in two dimensions here (row y AND column x).
-import { groupRows, type TextItem } from "../pdf/textLayout";
+import { groupRows, dedupeNearby, type TextItem } from "../pdf/textLayout";
 
 const JERSEY_RE = /^\d{1,3}$/;
 const CELL_X_TOLERANCE = 6;
@@ -37,24 +37,6 @@ export interface TeamPassSummary {
   combinations: PassCombination[];
   players: PlayerPassRow[];
   thirds: ThirdsSplit | null;
-}
-
-/**
- * Wyscout's PDF export draws some bold/emphasized numbers twice, a pixel or
- * two apart (seen on row totals and these third-split percentages) — a
- * rendering artifact, not two distinct values. Merges items whose x is
- * within `thresholdPx` of the previous kept item, rather than a fixed
- * rounding grid, since a rounding boundary can fall inside a genuine
- * duplicate's tiny spread and wrongly split it into two "clusters".
- */
-function dedupeNearby<T extends { x: number }>(items: T[], thresholdPx = 3): T[] {
-  const sorted = [...items].sort((a, b) => a.x - b.x);
-  const out: T[] = [];
-  for (const it of sorted) {
-    if (out.length > 0 && it.x - out[out.length - 1].x <= thresholdPx) continue;
-    out.push(it);
-  }
-  return out;
 }
 
 function parseThirds(items: TextItem[]): ThirdsSplit | null {

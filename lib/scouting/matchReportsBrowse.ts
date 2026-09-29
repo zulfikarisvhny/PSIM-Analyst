@@ -31,6 +31,9 @@ export interface PassNetworkPlayer {
   defThirdPct: number | null;
   midThirdPct: number | null;
   finalThirdPct: number | null;
+  xPct: number | null; // average on-pitch position, from the POSITIONS page's own diagram
+  yPct: number | null;
+  jersey: number | null;
 }
 
 export interface PassNetworkEdge {
@@ -66,6 +69,30 @@ export interface LineupPlayerEntry {
   photoUrl: string | null;
 }
 
+export interface EventLocationEntry {
+  playerId: number | null;
+  playerName: string;
+  jersey: number | null;
+  kind: "shot" | "loss" | "recovery" | "key_pass" | "cross";
+  half: "1st" | "2nd" | null;
+  minute: string | null;
+  shotType: string | null;
+  outcome: "goal" | "on_target" | "blocked" | "wide" | null;
+  xg: number | null;
+  psxg: number | null;
+  leadsToShot: boolean | null;
+  xPct: number;
+  yPct: number;
+}
+
+export interface FormationLineupEntry {
+  playerId: number | null;
+  playerName: string;
+  jersey: number;
+  xPct: number;
+  yPct: number;
+}
+
 export interface PlayerPhysicalStat {
   playerId: number;
   name: string;
@@ -98,6 +125,11 @@ export interface MatchReportDetail {
   goals: { home: GoalEntry[]; away: GoalEntry[] } | null;
   events: { home: MatchEventEntry[]; away: MatchEventEntry[] } | null;
   lineups: { home: LineupPlayerEntry[]; away: LineupPlayerEntry[] } | null;
+  eventLocations: { home: EventLocationEntry[]; away: EventLocationEntry[] } | null;
+  formationLineups: {
+    starting: { home: FormationLineupEntry[]; away: FormationLineupEntry[] };
+    final: { home: FormationLineupEntry[]; away: FormationLineupEntry[] };
+  } | null;
 }
 
 interface RawMatch {
@@ -152,6 +184,9 @@ interface RawSummaryRow {
   def_third_pct: number | null;
   mid_third_pct: number | null;
   final_third_pct: number | null;
+  x_pct: number | null;
+  y_pct: number | null;
+  jersey_number: number | null;
 }
 
 interface RawPlayer {
@@ -179,6 +214,35 @@ interface RawEventRow {
   sub_in_player_id: number | null;
   sub_in_player_name_raw: string | null;
   minute: string;
+}
+
+interface RawEventLocationRow {
+  match_id: number;
+  club_id: number;
+  player_id: number | null;
+  player_name_raw: string;
+  jersey_number: number | null;
+  kind: "shot" | "loss" | "recovery" | "key_pass" | "cross";
+  half: "1st" | "2nd" | null;
+  minute: string | null;
+  shot_type: string | null;
+  outcome: "goal" | "on_target" | "blocked" | "wide" | null;
+  xg: number | null;
+  psxg: number | null;
+  leads_to_shot: boolean | null;
+  x_pct: number;
+  y_pct: number;
+}
+
+interface RawFormationLineupRow {
+  match_id: number;
+  club_id: number;
+  player_id: number | null;
+  player_name_raw: string;
+  jersey_number: number;
+  phase: "starting" | "final";
+  x_pct: number;
+  y_pct: number;
 }
 
 interface RawPhysicalRow {
@@ -230,22 +294,35 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     });
   }
 
-  const [{ data: segmentRows }, { data: comboRows }, { data: summaryRows }, { data: players }, { data: physicalRows }, { data: eventRows }, { data: lineupRows }] =
-    await Promise.all([
-      supabase
-        .from("match_time_segments")
-        .select("match_id, club_id, segment, possession_pct, pass_accuracy_pct, long_pass_share_pct, duels_win_pct, attacks_per_min, recoveries_per_min, avg_formation_line_m, ppda"),
-      supabase.from("match_pass_combinations").select("match_id, from_player_id, to_player_id, pass_count"),
-      supabase.from("match_passing_summary").select("match_id, player_id, total_passes, def_third_pct, mid_third_pct, final_third_pct"),
-      supabase.from("players").select("id, name, club_id, photo_url"),
-      supabase
-        .from("player_physical_stats")
-        .select("match_id, player_id, total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count, top_speed_kmh, accelerations, decelerations, minutes_played"),
-      supabase
-        .from("match_events")
-        .select("match_id, club_id, event_type, player_id, player_name_raw, sub_in_player_id, sub_in_player_name_raw, minute"),
-      supabase.from("match_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, position_code"),
-    ]);
+  const [
+    { data: segmentRows },
+    { data: comboRows },
+    { data: summaryRows },
+    { data: players },
+    { data: physicalRows },
+    { data: eventRows },
+    { data: lineupRows },
+    { data: eventLocationRows },
+    { data: formationLineupRows },
+  ] = await Promise.all([
+    supabase
+      .from("match_time_segments")
+      .select("match_id, club_id, segment, possession_pct, pass_accuracy_pct, long_pass_share_pct, duels_win_pct, attacks_per_min, recoveries_per_min, avg_formation_line_m, ppda"),
+    supabase.from("match_pass_combinations").select("match_id, from_player_id, to_player_id, pass_count"),
+    supabase.from("match_passing_summary").select("match_id, player_id, total_passes, def_third_pct, mid_third_pct, final_third_pct, x_pct, y_pct, jersey_number"),
+    supabase.from("players").select("id, name, club_id, photo_url"),
+    supabase
+      .from("player_physical_stats")
+      .select("match_id, player_id, total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count, top_speed_kmh, accelerations, decelerations, minutes_played"),
+    supabase
+      .from("match_events")
+      .select("match_id, club_id, event_type, player_id, player_name_raw, sub_in_player_id, sub_in_player_name_raw, minute"),
+    supabase.from("match_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, position_code"),
+    supabase
+      .from("match_event_locations")
+      .select("match_id, club_id, player_id, player_name_raw, jersey_number, kind, half, minute, shot_type, outcome, xg, psxg, leads_to_shot, x_pct, y_pct"),
+    supabase.from("match_formation_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, phase, x_pct, y_pct"),
+  ]);
 
   const playerById = new Map(((players ?? []) as RawPlayer[]).map((p) => [p.id, p]));
 
@@ -312,6 +389,42 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     lineupsByKey.set(key, list);
   }
 
+  const eventLocationsByKey = new Map<string, EventLocationEntry[]>();
+  for (const r of (eventLocationRows ?? []) as RawEventLocationRow[]) {
+    const key = `${r.match_id}:${r.club_id}`;
+    const list = eventLocationsByKey.get(key) ?? [];
+    list.push({
+      playerId: r.player_id,
+      playerName: r.player_id ? playerById.get(r.player_id)?.name ?? r.player_name_raw : r.player_name_raw,
+      jersey: r.jersey_number,
+      kind: r.kind,
+      half: r.half,
+      minute: r.minute,
+      shotType: r.shot_type,
+      outcome: r.outcome,
+      xg: r.xg,
+      psxg: r.psxg,
+      leadsToShot: r.leads_to_shot,
+      xPct: r.x_pct,
+      yPct: r.y_pct,
+    });
+    eventLocationsByKey.set(key, list);
+  }
+
+  const formationLineupsByKey = new Map<string, { starting: FormationLineupEntry[]; final: FormationLineupEntry[] }>();
+  for (const r of (formationLineupRows ?? []) as RawFormationLineupRow[]) {
+    const key = `${r.match_id}:${r.club_id}`;
+    const entry = formationLineupsByKey.get(key) ?? { starting: [], final: [] };
+    entry[r.phase].push({
+      playerId: r.player_id,
+      playerName: r.player_id ? playerById.get(r.player_id)?.name ?? r.player_name_raw : r.player_name_raw,
+      jersey: r.jersey_number,
+      xPct: r.x_pct,
+      yPct: r.y_pct,
+    });
+    formationLineupsByKey.set(key, entry);
+  }
+
   const goalsByKey = new Map<string, GoalEntry[]>();
   for (const [key, list] of eventsByKey) {
     goalsByKey.set(
@@ -351,6 +464,9 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
         defThirdPct: r.def_third_pct,
         midThirdPct: r.mid_third_pct,
         finalThirdPct: r.final_third_pct,
+        xPct: r.x_pct,
+        yPct: r.y_pct,
+        jersey: r.jersey_number,
       }))
       .sort((a, b) => b.totalPasses - a.totalPasses);
 
@@ -400,6 +516,17 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     const lineupAway = lineupsByKey.get(`${m.id}:${m.away_club_id}`) ?? [];
     const lineups = lineupHome.length > 0 || lineupAway.length > 0 ? { home: lineupHome, away: lineupAway } : null;
 
+    const eventLocHome = eventLocationsByKey.get(`${m.id}:${m.home_club_id}`) ?? [];
+    const eventLocAway = eventLocationsByKey.get(`${m.id}:${m.away_club_id}`) ?? [];
+    const eventLocations = eventLocHome.length > 0 || eventLocAway.length > 0 ? { home: eventLocHome, away: eventLocAway } : null;
+
+    const flHome = formationLineupsByKey.get(`${m.id}:${m.home_club_id}`) ?? { starting: [], final: [] };
+    const flAway = formationLineupsByKey.get(`${m.id}:${m.away_club_id}`) ?? { starting: [], final: [] };
+    const formationLineups =
+      flHome.starting.length > 0 || flAway.starting.length > 0
+        ? { starting: { home: flHome.starting, away: flAway.starting }, final: { home: flHome.final, away: flAway.final } }
+        : null;
+
     reports.push({
       matchId: m.id,
       matchDate: m.match_date,
@@ -419,6 +546,8 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
       goals,
       events,
       lineups,
+      eventLocations,
+      formationLineups,
     });
   }
 

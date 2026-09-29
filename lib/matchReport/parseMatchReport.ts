@@ -9,7 +9,12 @@ import { parseTimeSegments, type TimeSegmentsResult } from "./parseTimeSegments"
 import { extractPatternFills } from "./resolveChartColors";
 import { extractIconFills, classifyMarkerIcon, type IconFill } from "./resolveIconColors";
 import { parseMatchEvents, parseStartingLineups, type MatchEvent, type StartingPlayer } from "./parseMatchEvents";
+import { parseAveragePositions, type AveragePosition } from "./parseAveragePositions";
 import { parsePassCombinationPage, type TeamPassSummary } from "./parsePassCombinations";
+import { parseShots, type ShotEvent } from "./parseShots";
+import { parseEventScatterPage, type ScatterEvent } from "./parseEventScatterPage";
+import { extractPathBoxes, findEventDiagramBoxes } from "./resolvePathBoxes";
+import { parseFormationLineups, type FormationSlot } from "./parseFormationLineups";
 
 export interface MatchReportMeta {
   homeTeam: string | null;
@@ -36,6 +41,16 @@ export interface ExtractedMatchReport {
   matchEvents: { home: MatchEvent[]; away: MatchEvent[] };
   // The 11 starting players per side (jersey, formation slot, name) — for the pitch/formation view.
   startingLineups: { home: StartingPlayer[]; away: StartingPlayer[] };
+  // Every player's average on-pitch position (jersey + x/y %), from the POSITIONS page's own diagram — includes subs, not just the starting 11.
+  averagePositions: { home: AveragePosition[]; away: AveragePosition[] };
+  shots: { home: ShotEvent[]; away: ShotEvent[] };
+  losses: { home: ScatterEvent[]; away: ScatterEvent[] };
+  recoveries: { home: ScatterEvent[]; away: ScatterEvent[] };
+  keyPasses: { home: ScatterEvent[]; away: ScatterEvent[] };
+  crosses: { home: ScatterEvent[]; away: ScatterEvent[] };
+  // Real per-phase formation-slot positions from the POSITIONS page's own diagrams — "starting" = earliest phase, "final" = whatever was on the pitch at the final whistle.
+  startingFormationLineup: { home: FormationSlot[]; away: FormationSlot[] };
+  finalFormationLineup: { home: FormationSlot[]; away: FormationSlot[] };
 }
 
 function parseMetadata(items: TextItem[], pageWidth: number): MatchReportMeta {
@@ -150,6 +165,29 @@ function findPassesPageIndices(pagesText: string[]): number[] {
     return acc;
   }, []);
 }
+
+/** Finds both "Shots" pages (one per team) via their unique table columns — "Shots / on target" elsewhere in the report never has both. */
+function findShotsPageIndices(pagesText: string[]): number[] {
+  return pagesText.reduce<number[]>((acc, raw, i) => {
+    const t = raw.replace(/\s+/g, "").toUpperCase();
+    if (t.includes("SHOTTYPE") && t.includes("PSXG")) acc.push(i);
+    return acc;
+  }, []);
+}
+
+function findByNeedle(pagesText: string[], test: (stripped: string) => boolean): number {
+  return pagesText.findIndex((t) => test(t.replace(/\s+/g, "").toUpperCase()));
+}
+
+// "LOSSES"/"RECOVERIES" alone also appear in Team/Player Stats column headers
+// ("Losses / low / medium / high", "Recoveries / opponent half"); each
+// location page's own "<Kind> type" breakdown caption is unique to it.
+const findLossesPageIndex = (pagesText: string[]) => findByNeedle(pagesText, (t) => t.includes("LOSSESTYPE"));
+const findRecoveriesPageIndex = (pagesText: string[]) => findByNeedle(pagesText, (t) => t.includes("RECOVERIESTYPE"));
+// "Key passes" is also a Player Stats column header; only the location page pairs it with a 1st/2nd-half split.
+const findKeyPassesPageIndex = (pagesText: string[]) => findByNeedle(pagesText, (t) => t.includes("KEYPASSES") && t.includes("1STHALF"));
+// The goalkeeper page's "Crosses against ... CROSSES MAP" widget also matches "CROSSES" + "1STHALF"; exclude it by its own unique caption.
+const findCrossesPageIndex = (pagesText: string[]) => findByNeedle(pagesText, (t) => t.includes("CROSSES") && t.includes("1STHALF") && !t.includes("CROSSESMAP"));
 
 /**
  * Reads the Starting Lineup page's phase markers — "1'", "45+X'" (end of 1st
@@ -309,12 +347,21 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
   const positionsPageNum = findPositionsPageIndex(pagesText) + 1;
   let homeScheme: string | null = null;
   let awayScheme: string | null = null;
+  let averagePositions: { home: AveragePosition[]; away: AveragePosition[] } = { home: [], away: [] };
+  let startingFormationLineup: { home: FormationSlot[]; away: FormationSlot[] } = { home: [], away: [] };
+  let finalFormationLineup: { home: FormationSlot[]; away: FormationSlot[] } = { home: [], away: [] };
   if (positionsPageNum > 0) {
     const positionsPage = await doc.getPage(positionsPageNum);
     const items = await getPageItems(positionsPage);
-    const formations = parseFormations(items, positionsPage.getViewport({ scale: 1 }).width, meta.durationMinutes);
+    const positionsWidth = positionsPage.getViewport({ scale: 1 }).width;
+    const formations = parseFormations(items, positionsWidth, meta.durationMinutes);
     homeScheme = formations.homeScheme;
     awayScheme = formations.awayScheme;
+    averagePositions = parseAveragePositions(items);
+    const positionsPathBoxes = await extractPathBoxes(pdfjsLib, positionsPage);
+    const formationLineups = parseFormationLineups(items, positionsPathBoxes, positionsWidth);
+    startingFormationLineup = formationLineups.starting;
+    finalFormationLineup = formationLineups.final;
   }
 
   let timeSegments: TimeSegmentsResult | null = null;
@@ -346,6 +393,52 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
     away: [...goalEntries.filter((e) => e.side === "away"), ...lineupEvents.away].sort((a, b) => minuteSortValue(a.minute) - minuteSortValue(b.minute)),
   };
 
+  let shots: { home: ShotEvent[]; away: ShotEvent[] } = { home: [], away: [] };
+  const shotsPageNums = findShotsPageIndices(pagesText).map((i) => i + 1);
+  if (shotsPageNums.length > 0 && meta.homeTeam && meta.awayTeam) {
+    for (const pageNum of shotsPageNums) {
+      const shotsPage = await doc.getPage(pageNum);
+      const items = await getPageItems(shotsPage);
+      const isHome = items.some((it) => it.str === meta.homeTeam);
+      const isAway = items.some((it) => it.str === meta.awayTeam);
+      const fills = await extractIconFills(pdfjsLib, shotsPage);
+      const side: "home" | "away" | null = isHome ? "home" : isAway ? "away" : null;
+      if (!side) continue;
+      const parsed = parseShots(items, fills).map((s) => {
+        const isGoal = matchEvents[side].some((e) => e.type === "goal" && e.minute === s.minute);
+        return isGoal ? { ...s, outcome: "goal" as const } : s;
+      });
+      shots[side] = parsed;
+    }
+  }
+
+  async function parseScatterPage(pageNum: number, detectLeadsToShot: boolean): Promise<{ home: ScatterEvent[]; away: ScatterEvent[] }> {
+    const page = await doc.getPage(pageNum);
+    const items = await getPageItems(page);
+    const width = page.getViewport({ scale: 1 }).width;
+    const pathBoxes = await extractPathBoxes(pdfjsLib, page);
+    const eventBoxes = findEventDiagramBoxes(pathBoxes, width);
+    if (!eventBoxes) return { home: [], away: [] };
+    const fills = detectLeadsToShot ? await extractIconFills(pdfjsLib, page) : [];
+    return parseEventScatterPage(items, eventBoxes, fills, detectLeadsToShot);
+  }
+
+  let losses: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
+  const lossesPageNum = findLossesPageIndex(pagesText) + 1;
+  if (lossesPageNum > 0) losses = await parseScatterPage(lossesPageNum, true);
+
+  let recoveries: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
+  const recoveriesPageNum = findRecoveriesPageIndex(pagesText) + 1;
+  if (recoveriesPageNum > 0) recoveries = await parseScatterPage(recoveriesPageNum, false);
+
+  let keyPasses: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
+  const keyPassesPageNum = findKeyPassesPageIndex(pagesText) + 1;
+  if (keyPassesPageNum > 0) keyPasses = await parseScatterPage(keyPassesPageNum, false);
+
+  let crosses: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
+  const crossesPageNum = findCrossesPageIndex(pagesText) + 1;
+  if (crossesPageNum > 0) crosses = await parseScatterPage(crossesPageNum, false);
+
   return {
     meta,
     teamStatsHome,
@@ -357,5 +450,13 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
     passCombinationsAway,
     matchEvents,
     startingLineups,
+    averagePositions,
+    shots,
+    losses,
+    recoveries,
+    keyPasses,
+    crosses,
+    startingFormationLineup,
+    finalFormationLineup,
   };
 }

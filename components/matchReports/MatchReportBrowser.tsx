@@ -3,8 +3,11 @@
 import { useMemo, useState } from "react";
 import { TimeSegmentChart } from "./TimeSegmentChart";
 import { PassCombinationMatrix, TeamMatrix } from "./PassCombinationMatrix";
+import { PassNetworkPitch } from "./PassNetworkPitch";
+import { ShotMap } from "./ShotMap";
+import { ZoneMap } from "./ZoneMap";
 import { PhysicalStatsTable } from "./PhysicalStatsTable";
-import { PitchLineup } from "./PitchLineup";
+import { FormationLineupPitch } from "./FormationLineupPitch";
 import { AccuracyDonuts } from "./AccuracyDonuts";
 
 const PSIM = "PSIM Yogyakarta";
@@ -34,6 +37,12 @@ interface PassNetworkPlayer {
   playerId: number;
   name: string;
   totalPasses: number;
+  defThirdPct?: number | null;
+  midThirdPct?: number | null;
+  finalThirdPct?: number | null;
+  xPct: number | null;
+  yPct: number | null;
+  jersey: number | null;
 }
 interface PassNetworkEdge {
   fromPlayerId: number;
@@ -80,6 +89,30 @@ interface LineupPlayerEntry {
   photoUrl: string | null;
 }
 
+interface EventLocationEntry {
+  playerId: number | null;
+  playerName: string;
+  jersey: number | null;
+  kind: "shot" | "loss" | "recovery" | "key_pass" | "cross";
+  half: "1st" | "2nd" | null;
+  minute: string | null;
+  shotType: string | null;
+  outcome: "goal" | "on_target" | "blocked" | "wide" | null;
+  xg: number | null;
+  psxg: number | null;
+  leadsToShot: boolean | null;
+  xPct: number;
+  yPct: number;
+}
+
+interface FormationLineupEntry {
+  playerId: number | null;
+  playerName: string;
+  jersey: number;
+  xPct: number;
+  yPct: number;
+}
+
 interface MatchReportDetail {
   matchId: number;
   matchDate: string;
@@ -99,6 +132,11 @@ interface MatchReportDetail {
   goals: { home: GoalEntry[]; away: GoalEntry[] } | null;
   events: { home: MatchEventEntry[]; away: MatchEventEntry[] } | null;
   lineups: { home: LineupPlayerEntry[]; away: LineupPlayerEntry[] } | null;
+  eventLocations: { home: EventLocationEntry[]; away: EventLocationEntry[] } | null;
+  formationLineups: {
+    starting: { home: FormationLineupEntry[]; away: FormationLineupEntry[] };
+    final: { home: FormationLineupEntry[]; away: FormationLineupEntry[] };
+  } | null;
 }
 
 const SEGMENT_ORDER = ["0-15", "16-30", "31-45+", "46-60", "61-75", "76-90+"];
@@ -227,60 +265,18 @@ const SUMMARY_KEYS = ["shots_on_target", "corners", "yellow_red_cards", "fouls_s
 // instead of a 55-row wall.
 const ATTACK_TYPES_KEYS = ["total_with_shots", "positional_attacks_with_shots", "counterattacks", "corners", "free_kicks", "corners_with_shots", "free_kicks_with_shots"];
 
-const CATEGORIES: { title: string; keys: string[] }[] = [
-  { title: "Shooting", keys: ["shots_on_target", "shots_on_post_blocked_wide", "from_penalty_area_on_target", "outside_penalty_area_on_target", "average_shot_distance_m"] },
-  { title: "Possession", keys: ["pure_possession_time", "number_of_possessions", "possessions_reaching_opponent_half", "possessions_reaching_opponent_penalty_area", "average_possession_duration", "dead_time"] },
-  {
-    title: "Passing",
-    keys: [
-      "total_passes_accurate",
-      "forward_passes_accurate",
-      "back_passes_accurate",
-      "lateral_passes_accurate",
-      "progressive_passes_accurate",
-      "long_passes_accurate",
-      "passes_to_final_third_accurate",
-      "average_pass_to_final_third_length_m",
-      "passes_to_penalty_area_accurate",
-      "smart_passes_accurate",
-      "shot_assists",
-      "through_passes_accurate",
-      "crosses_accurate",
-      "crosses_low_high_blocked",
-      "deep_completions",
-      "match_tempo",
-      "average_pass_length_m",
-    ],
-  },
-  {
-    title: "Defending & Duels",
-    keys: [
-      "sliding_tackles",
-      "interceptions",
-      "clearances",
-      "passes_allowed_per_def_action_ppda",
-      "recoveries_low_medium_high",
-      "opponent_half_recoveries",
-      "losses_low_medium_high",
-      "total_duels_won",
-      "offensive_duels_won",
-      "defensive_duels_won",
-      "loose_ball_duels_won",
-      "aerial_duels_won",
-      "challenge_intensity",
-      "dribbles_successful",
-    ],
-  },
-  { title: "Discipline", keys: ["offsides", "fouls_suffered", "yellow_red_cards"] },
-];
-
 function parseLeadingNumber(v: string | undefined): number | null {
   if (!v) return null;
   const m = v.match(/^-?\d+(\.\d+)?/);
   return m ? Number(m[0]) : null;
 }
 
-function ComparisonRow({ label, homeRaw, awayRaw }: { label: string; homeRaw?: string; awayRaw?: string }) {
+/** "517/436 84%" -> "517/436" — drops the trailing accuracy percentage, keeping just the raw count. */
+function dropAccuracyPct(v: string | undefined): string | undefined {
+  return v?.match(/^\d+\/\d+/)?.[0] ?? v;
+}
+
+function ComparisonRow({ label, homeRaw, awayRaw, showBar = true }: { label: string; homeRaw?: string; awayRaw?: string; showBar?: boolean }) {
   const homeNum = parseLeadingNumber(homeRaw);
   const awayNum = parseLeadingNumber(awayRaw);
   let homePct = 50;
@@ -292,15 +288,17 @@ function ComparisonRow({ label, homeRaw, awayRaw }: { label: string; homeRaw?: s
 
   return (
     <div className="py-3">
-      <div className="flex items-center justify-between gap-2 mb-2">
+      <div className={`flex items-center justify-between gap-2 ${showBar ? "mb-2" : ""}`}>
         <span className="text-sm font-bold text-gray-900 dark:text-white shrink-0">{homeRaw ?? "—"}</span>
         <span className="text-gray-400 dark:text-gray-500 text-center flex-1 truncate text-xs font-medium">{label}</span>
         <span className="text-sm font-bold text-gray-900 dark:text-white shrink-0 text-right">{awayRaw ?? "—"}</span>
       </div>
-      <div className="flex items-center gap-1">
-        <div className="h-2 rounded-full bg-blue-600 dark:bg-[#3987e5]" style={{ width: `calc(${homePct}% - 2px)` }} />
-        <div className="h-2 rounded-full bg-orange-500" style={{ width: `calc(${awayPct}% - 2px)` }} />
-      </div>
+      {showBar && (
+        <div className="flex items-center gap-1">
+          <div className="h-2 rounded-full bg-blue-600 dark:bg-[#3987e5]" style={{ width: `calc(${homePct}% - 2px)` }} />
+          <div className="h-2 rounded-full bg-orange-500" style={{ width: `calc(${awayPct}% - 2px)` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -421,7 +419,6 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
   const [mode, setMode] = useState<"matchday" | "overall">("matchday");
   const [overallTab, setOverallTab] = useState<"dynamics" | "passing">("dynamics");
   const [expandedMatchId, setExpandedMatchId] = useState<number | null>(null);
-  const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [activeTab, setActiveTab] = useState<"facts" | "lineup" | "stats" | "attackTypes" | "dynamics" | "passing" | "physical">("facts");
   const aggregate = useMemo(() => buildSeasonAggregate(reports), [reports]);
 
@@ -437,18 +434,8 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
     );
   }
 
-  function toggleCategory(title: string) {
-    setOpenCategories((prev) => {
-      const next = new Set(prev);
-      if (next.has(title)) next.delete(title);
-      else next.add(title);
-      return next;
-    });
-  }
-
   function toggleMatch(id: number) {
     setExpandedMatchId((prev) => (prev === id ? null : id));
-    setOpenCategories(new Set());
     setActiveTab("facts");
   }
 
@@ -526,7 +513,7 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                     <div className="whitespace-nowrap text-gray-700 dark:text-gray-300">{formatMatchDate(report.matchDate)}</div>
                     {report.round && <div className="text-gray-400 whitespace-nowrap mt-1">{gameWeekLabel(report.round)}</div>}
                   </div>
-                  <div className="flex items-center flex-1 min-w-0 -ml-[145px]">
+                  <div className="flex items-center flex-1 min-w-0 -ml-[125px]">
                     <div className="flex items-center gap-2 flex-1 min-w-0 justify-end">
                       <span className="text-sm font-semibold text-gray-900 dark:text-white truncate text-right">{report.homeTeam}</span>
                       <TeamCrest url={report.homeLogoUrl} />
@@ -583,7 +570,16 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                     )}
 
                     {activeTab === "lineup" && (
-                      <PitchLineup home={report.lineups?.home ?? []} away={report.lineups?.away ?? []} events={report.events} />
+                      report.formationLineups ? (
+                        <FormationLineupPitch
+                          homeTeam={report.homeTeam}
+                          awayTeam={report.awayTeam}
+                          starting={report.formationLineups.starting}
+                          final={report.formationLineups.final}
+                        />
+                      ) : (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">No formation lineup data available for this match.</p>
+                      )
                     )}
 
                     {activeTab === "stats" && (
@@ -600,39 +596,28 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
             <span>{report.away?.scheme ?? "—"}</span>
           </div>
 
-          <ComparisonRow label="Possession %" homeRaw={report.home?.possessionPct?.toString()} awayRaw={report.away?.possessionPct?.toString()} />
-          <AccuracyDonuts homeStats={report.home?.stats} awayStats={report.away?.stats} />
+          <AccuracyDonuts
+            homeStats={report.home?.stats}
+            awayStats={report.away?.stats}
+            homePossessionPct={report.home?.possessionPct}
+            awayPossessionPct={report.away?.possessionPct}
+            homeXg={report.home?.xg}
+            awayXg={report.away?.xg}
+          />
           <div className="border-t border-gray-200 dark:border-[#2a2b30] my-2" />
-          <ComparisonRow label="xG" homeRaw={report.home?.xg?.toString()} awayRaw={report.away?.xg?.toString()} />
-          <ComparisonRow label="Goals" homeRaw={report.home?.goals?.toString()} awayRaw={report.away?.goals?.toString()} />
+          <ComparisonRow
+            showBar={false}
+            label="total_passes_accurate"
+            homeRaw={dropAccuracyPct(report.home?.stats["total_passes_accurate"])}
+            awayRaw={dropAccuracyPct(report.away?.stats["total_passes_accurate"])}
+          />
+          <ComparisonRow showBar={false} label="xG" homeRaw={report.home?.xg?.toString()} awayRaw={report.away?.xg?.toString()} />
+          <ComparisonRow showBar={false} label="Goals" homeRaw={report.home?.goals?.toString()} awayRaw={report.away?.goals?.toString()} />
           {SUMMARY_KEYS.map((key) => (
-            <ComparisonRow key={key} label={key} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
+            <ComparisonRow showBar={false} key={key} label={key} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
           ))}
-
-          <div className="mt-3 flex flex-col gap-1.5">
-            {CATEGORIES.map((cat) => {
-              const isOpen = openCategories.has(cat.title);
-              return (
-                <div key={cat.title} className="border border-gray-200 dark:border-[#2a2b30] rounded-md">
-                  <button
-                    onClick={() => toggleCategory(cat.title)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-700 dark:text-gray-200"
-                  >
-                    <span>{cat.title}</span>
-                    <span className="text-gray-400">{isOpen ? "−" : "+"}</span>
-                  </button>
-                  {isOpen && (
-                    <div className="px-3 pb-3">
-                      {cat.keys.map((key) => (
-                        <ComparisonRow key={key} label={key} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-
-          </div>
+          <ComparisonRow showBar={false} label="interceptions" homeRaw={report.home?.stats["interceptions"]} awayRaw={report.away?.stats["interceptions"]} />
+          <ComparisonRow showBar={false} label="offsides" homeRaw={report.home?.stats["offsides"]} awayRaw={report.away?.stats["offsides"]} />
                       </>
                     )}
 
@@ -641,27 +626,76 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                         {ATTACK_TYPES_KEYS.map((key) => (
                           <ComparisonRow key={key} label={key} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
                         ))}
+                        {report.eventLocations && (
+                          <>
+                            <div className="border-t border-gray-200 dark:border-[#2a2b30] my-4" />
+                            <ShotMap
+                              homeTeam={report.homeTeam}
+                              awayTeam={report.awayTeam}
+                              homeShots={report.eventLocations.home.filter((e) => e.kind === "shot")}
+                              awayShots={report.eventLocations.away.filter((e) => e.kind === "shot")}
+                            />
+                          </>
+                        )}
                       </div>
                     )}
 
                     {activeTab === "dynamics" && (
-                      report.timeSegments ? (
-                        <TimeSegmentChart
-                          homeTeam={report.homeTeam}
-                          awayTeam={report.awayTeam}
-                          home={report.timeSegments.home}
-                          away={report.timeSegments.away}
-                          homeGoals={report.goals?.home}
-                          awayGoals={report.goals?.away}
-                        />
-                      ) : (
-                        <p className="text-xs text-gray-500 dark:text-gray-400">No match dynamics data available.</p>
-                      )
+                      <div className="flex flex-col gap-6">
+                        {report.timeSegments ? (
+                          <TimeSegmentChart
+                            homeTeam={report.homeTeam}
+                            awayTeam={report.awayTeam}
+                            home={report.timeSegments.home}
+                            away={report.timeSegments.away}
+                            homeGoals={report.goals?.home}
+                            awayGoals={report.goals?.away}
+                          />
+                        ) : (
+                          <p className="text-xs text-gray-500 dark:text-gray-400">No match dynamics data available.</p>
+                        )}
+                        {report.eventLocations && (
+                          <>
+                            <div className="border-t border-gray-200 dark:border-[#2a2b30]" />
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                              <div>
+                                <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">Losses by zone</h4>
+                                <ZoneMap
+                                  kind="loss"
+                                  homeTeam={report.homeTeam}
+                                  awayTeam={report.awayTeam}
+                                  homeEvents={report.eventLocations.home.filter((e) => e.kind === "loss")}
+                                  awayEvents={report.eventLocations.away.filter((e) => e.kind === "loss")}
+                                />
+                              </div>
+                              <div>
+                                <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">Recoveries by zone</h4>
+                                <ZoneMap
+                                  kind="recovery"
+                                  homeTeam={report.homeTeam}
+                                  awayTeam={report.awayTeam}
+                                  homeEvents={report.eventLocations.home.filter((e) => e.kind === "recovery")}
+                                  awayEvents={report.eventLocations.away.filter((e) => e.kind === "recovery")}
+                                />
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     )}
 
                     {activeTab === "passing" && (
                       report.passNetwork ? (
-                        <PassCombinationMatrix homeTeam={report.homeTeam} awayTeam={report.awayTeam} home={report.passNetwork.home} away={report.passNetwork.away} />
+                        <div className="flex flex-col gap-6">
+                          <PassNetworkPitch
+                            homeTeam={report.homeTeam}
+                            awayTeam={report.awayTeam}
+                            homeNetwork={report.passNetwork.home}
+                            awayNetwork={report.passNetwork.away}
+                          />
+                          <div className="border-t border-gray-200 dark:border-[#2a2b30]" />
+                          <PassCombinationMatrix homeTeam={report.homeTeam} awayTeam={report.awayTeam} home={report.passNetwork.home} away={report.passNetwork.away} />
+                        </div>
                       ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400">No pass combination data available.</p>
                       )
