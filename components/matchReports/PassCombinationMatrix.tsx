@@ -41,7 +41,7 @@ export function TeamMatrix({ team, teamName }: { team: TeamPassNetwork; teamName
   return (
     <div>
       <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-3">
-        Rows = passer, columns = receiver. {grandTotal} combinations logged (Wyscout only shows pairs with more than 3
+        Rows = passer, columns = receiver. {grandTotal} combinations logged (Wyscout only shows pairs with 3 or more
         passes in one direction).
       </p>
       <div className="overflow-x-auto">

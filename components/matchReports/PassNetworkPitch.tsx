@@ -134,7 +134,7 @@ function TeamNetwork({ network, teamName }: { network: TeamPassNetwork; teamName
   }
 
   const posById = new Map(positioned.map((p) => [p.playerId, p]));
-  const connectableEdges = network.edges.filter((e) => posById.has(e.fromPlayerId) && posById.has(e.toPlayerId) && e.passCount > 3);
+  const connectableEdges = network.edges.filter((e) => posById.has(e.fromPlayerId) && posById.has(e.toPlayerId) && e.passCount >= 3);
   const edges = selectedId === null ? connectableEdges : connectableEdges.filter((e) => e.fromPlayerId === selectedId || e.toPlayerId === selectedId);
   const connectedIds = new Set<number>();
   if (selectedId !== null) {
@@ -240,8 +240,8 @@ function TeamNetwork({ network, teamName }: { network: TeamPassNetwork; teamName
       </div>
       <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center mt-1.5">
         {selectedId === null
-          ? "Shows only combinations with more than 3 passes in one direction. Click a player to isolate their passes."
-          : `Showing combinations of more than 3 passes to/from #${posById.get(selectedId)?.jersey ?? "?"} ${posById.get(selectedId)?.name ?? ""}. Click them again to clear.`}
+          ? "Shows only combinations with 3 or more passes in one direction. Click a player to isolate their passes."
+          : `Showing combinations of 3 or more passes to/from #${posById.get(selectedId)?.jersey ?? "?"} ${posById.get(selectedId)?.name ?? ""}. Click them again to clear.`}
       </p>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 mt-3 max-w-2xl mx-auto text-[11px] text-gray-600 dark:text-gray-300">
         {[...positioned].sort((a, b) => (a.jersey ?? 0) - (b.jersey ?? 0)).map((p) => (
