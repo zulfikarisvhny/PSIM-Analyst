@@ -489,6 +489,14 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     const away = statsByKey.get(`${m.away_club_id}:${m.match_date}`) ?? null;
     if (!home && !away) continue; // no imported report for this match yet
 
+    // This browser is PSIM's own match report list — an opponent-vs-opponent
+    // scouting match (e.g. Borneo vs Persija) is still imported and feeds the
+    // Opponent Analyst pass network/average position aggregates, but doesn't
+    // belong in this list.
+    const homeName = firstClub(m.home).name;
+    const awayName = firstClub(m.away).name;
+    if (homeName !== PSIM && awayName !== PSIM) continue;
+
     const segHome = segmentsByKey.get(`${m.id}:${m.home_club_id}`) ?? [];
     const segAway = segmentsByKey.get(`${m.id}:${m.away_club_id}`) ?? [];
     const timeSegments = segHome.length > 0 || segAway.length > 0 ? { home: segHome, away: segAway } : null;
@@ -499,8 +507,8 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
 
     const homeClub = firstClub(m.home);
     const awayClub = firstClub(m.away);
-    const homeTeam = homeClub.name;
-    const awayTeam = awayClub.name;
+    const homeTeam = homeName;
+    const awayTeam = awayName;
     const psimClubId = homeTeam === PSIM ? m.home_club_id : awayTeam === PSIM ? m.away_club_id : null;
     const psimPhysicalStats = psimClubId !== null ? physicalByKey.get(`${m.id}:${psimClubId}`) ?? null : null;
 

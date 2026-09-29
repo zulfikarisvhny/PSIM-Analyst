@@ -4,6 +4,7 @@ import { fetchTeamPlayers, fetchLeaguePositionAverages, fetchLeaguePlayerProfile
 import { NEW_SIGNEES } from "@/lib/scouting/squadUpdate";
 import { NEW_SIGNEES_BY_TEAM } from "@/lib/scouting/newSignees";
 import { MATCH_LOG_BY_TEAM } from "@/lib/scouting/matchlog";
+import { fetchTeamPassNetworkFromReports } from "@/lib/scouting/teamPassNetworkFromReports";
 import { ScoutingTabs } from "@/components/scouting/ScoutingTabs";
 
 // Cache the rendered page for 5 min so visits are served instantly instead of
@@ -26,13 +27,14 @@ export default async function ScoutingPage({
 
   // These 6 queries are independent — run them in parallel instead of one
   // sequential await each, which was serializing network round-trips to Supabase.
-  const [rows, players, leaguePositionAverages, leagueDefenderPool, incomingPlayers, formationSigneeNexusRows] = await Promise.all([
+  const [rows, players, leaguePositionAverages, leagueDefenderPool, incomingPlayers, formationSigneeNexusRows, realPassNetwork] = await Promise.all([
     fetchLeagueTable(),
     fetchTeamPlayers(focusTeam),
     fetchLeaguePositionAverages(),
     fetchLeaguePlayerProfilePool(),
     fetchPlayersByExactName(newSigneeNames),
     fetchPlayersByExactName(formationSigneeNexusNames),
+    fetchTeamPassNetworkFromReports(focusTeam),
   ]);
 
   // Signees with real Nexus history (found above) plus synthetic placeholder
@@ -101,6 +103,7 @@ export default async function ScoutingPage({
         leaguePositionAverages={leaguePositionAverages}
         leagueDefenderPool={leagueDefenderPool}
         incomingPlayers={incomingPlayers}
+        realPassNetwork={realPassNetwork}
       />
 
       {/* Tactical notes: pull from a future `scouting_intel` table once it exists;

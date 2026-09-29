@@ -125,7 +125,16 @@ function ArrowHead({ cx, cy, angle, size }: { cx: number; cy: number; angle: num
   return <polygon points={`${tipX},${tipY} ${baseX + perpX},${baseY + perpY} ${baseX - perpX},${baseY - perpY}`} fill="#1f2937" fillOpacity="0.65" />;
 }
 
-function TeamNetwork({ network, teamName }: { network: TeamPassNetwork; teamName: string }) {
+export function TeamNetwork({
+  network,
+  teamName,
+  mode = "network",
+}: {
+  network: TeamPassNetwork;
+  teamName: string;
+  /** "positions" hides the pass-combination caption — for callers (e.g. an Average Position view) that pass edges: [] on purpose. */
+  mode?: "network" | "positions";
+}) {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const positioned = network.players.filter((p): p is PassNetworkPlayer & { xPct: number; yPct: number } => p.xPct !== null && p.yPct !== null);
 
@@ -238,11 +247,13 @@ function TeamNetwork({ network, teamName }: { network: TeamPassNetwork; teamName
           })}
         </svg>
       </div>
-      <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center mt-1.5">
-        {selectedId === null
-          ? "Shows only combinations with 3 or more passes in one direction. Click a player to isolate their passes."
-          : `Showing combinations of 3 or more passes to/from #${posById.get(selectedId)?.jersey ?? "?"} ${posById.get(selectedId)?.name ?? ""}. Click them again to clear.`}
-      </p>
+      {mode === "network" && (
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 text-center mt-1.5">
+          {selectedId === null
+            ? "Shows only combinations with 3 or more passes in one direction. Click a player to isolate their passes."
+            : `Showing combinations of 3 or more passes to/from #${posById.get(selectedId)?.jersey ?? "?"} ${posById.get(selectedId)?.name ?? ""}. Click them again to clear.`}
+        </p>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-1 mt-3 max-w-2xl mx-auto text-[11px] text-gray-600 dark:text-gray-300">
         {[...positioned].sort((a, b) => (a.jersey ?? 0) - (b.jersey ?? 0)).map((p) => (
           <div key={p.playerId} className="flex items-center gap-1.5 truncate">

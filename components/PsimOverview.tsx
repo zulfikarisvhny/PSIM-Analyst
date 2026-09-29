@@ -48,7 +48,7 @@ const FEATURES: Feature[] = [
     icon: "📈",
   },
   {
-    title: "Tactical Issues",
+    title: "Performance Evaluation",
     description: "Coach/analyst notes on attacking, defensive, and transition patterns.",
     icon: "🧩",
   },
