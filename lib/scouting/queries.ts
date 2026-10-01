@@ -1,4 +1,5 @@
 // lib/scouting/queries.ts
+import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { LeagueTeamRow, RadarPercentiles, RADAR_AXES } from "./types";
 
@@ -11,8 +12,10 @@ const supabase = createClient(
 
 const TABLE = "liga_1_2026_2027";
 
-/** Fetch every team row from the league table, sorted by points desc. */
-export async function fetchLeagueTable(): Promise<LeagueTeamRow[]> {
+/** Fetch every team row from the league table, sorted by points desc. Wrapped in
+ * React's cache() so the root layout (sidebar logo) and a page both calling this
+ * in the same request only hit Supabase once. */
+export const fetchLeagueTable = cache(async (): Promise<LeagueTeamRow[]> => {
   const { data, error } = await supabase.from(TABLE).select("*");
   if (error) throw error;
 
@@ -22,7 +25,7 @@ export async function fetchLeagueTable(): Promise<LeagueTeamRow[]> {
     const ptsB = b.W * 3 + b.D;
     return ptsB - ptsA;
   });
-}
+});
 
 /** Fetch a single team's row by exact name. */
 export async function fetchTeam(teamName: string): Promise<LeagueTeamRow | null> {

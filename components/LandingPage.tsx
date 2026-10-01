@@ -4,8 +4,6 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { LeagueTeamRow } from "@/lib/scouting/types";
 import { MATCH_LOG_BY_TEAM } from "@/lib/scouting/matchlog";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { LogoutButton } from "@/components/auth/LogoutButton";
 import styles from "./LandingPage.module.css";
 
 type Club = {
@@ -42,7 +40,7 @@ function Chevron({ direction }: { direction: "left" | "right" }) {
   );
 }
 
-export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; brandLogoUrl?: string | null }) {
+export function LandingPage({ rows }: { rows: LeagueTeamRow[] }) {
   const clubs: Club[] = useMemo(
     () =>
       rows.map((team, i) => ({
@@ -74,21 +72,6 @@ export function LandingPage({ rows, brandLogoUrl }: { rows: LeagueTeamRow[]; bra
 
   return (
     <main className={styles.page}>
-      <nav className={styles.nav}>
-        <Link href="/" className={styles.brand}>
-          {brandLogoUrl && <img src={brandLogoUrl} alt="" className={styles.brandCrest} />}
-          <b>PSIM Intelligence Dashboard</b>
-        </Link>
-        <div className={styles.navLinks}>
-          <Link href="/">← PSIM Overview</Link>
-          <a className={styles.active}>Opponent Analysis</a>
-        </div>
-        <div className={styles.navRight}>
-          <LogoutButton />
-          <ThemeToggle />
-        </div>
-      </nav>
-
       <section className={styles.hero}>
         <div className={styles.heroTop}>
           <div>

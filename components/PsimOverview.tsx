@@ -15,8 +15,6 @@ import type { ScheduleData } from "@/lib/scouting/schedule";
 import { ScheduleCalendar } from "@/components/schedule/ScheduleCalendar";
 import type { PsimStandingRow } from "@/lib/scouting/psimStandings";
 import { LeagueStandingsCard } from "@/components/scouting/LeagueStandingsCard";
-import { LogoutButton } from "@/components/auth/LogoutButton";
-import { ImportDataMenu } from "@/components/ImportDataMenu";
 import shell from "@/components/DashboardShell.module.css";
 
 const PSIM = "PSIM Yogyakarta";
@@ -99,21 +97,6 @@ export function PsimOverview({
       <div className={shell.blueField} aria-hidden="true" />
       <div className={shell.navySlice} aria-hidden="true" />
       <div className={shell.grain} aria-hidden="true" />
-
-      <nav className={shell.nav}>
-        <Link href="/" className={shell.brand}>
-          {psimRow?.logo_url && <img src={psimRow.logo_url} alt="" className={shell.brandCrest} />}
-          <b>PSIM Intelligence Dashboard</b>
-        </Link>
-        <div className={shell.navLinks}>
-          <a className={shell.active}>Overview</a>
-          <ImportDataMenu />
-          <Link href="/players">Player Profiles (New)</Link>
-        </div>
-        <div className={shell.navRight}>
-          <LogoutButton />
-        </div>
-      </nav>
 
       <div className="relative z-[1] max-w-[1500px] mx-auto px-3 sm:px-6 py-8">
         <div className={`${shell.card} flex items-center gap-4 mb-8 p-5`}>

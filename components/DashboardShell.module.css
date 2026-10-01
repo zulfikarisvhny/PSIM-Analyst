@@ -18,61 +18,6 @@
   display: none;
 }
 
-.nav {
-  position: relative;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  padding: 22px clamp(20px, 4vw, 48px);
-  background: #fff;
-  border-bottom: 1px solid #e5e9f0;
-}
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  color: #121b2d;
-  text-decoration: none;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-.brandCrest {
-  width: 34px;
-  height: 34px;
-  border-radius: 8px;
-  object-fit: contain;
-  background: #f5f7fb;
-  border: 1px solid #e5e9f0;
-  padding: 3px;
-}
-.navLinks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 22px;
-  margin-left: 48px;
-}
-.navLinks a {
-  color: #64748b;
-  text-decoration: none;
-  font-size: 12.5px;
-  font-weight: 600;
-}
-.navLinks a:hover {
-  color: #121b2d;
-}
-.navLinks .active {
-  color: #121b2d;
-  border-bottom: 2px solid #2f63d4;
-  padding-bottom: 3px;
-}
-.navRight {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 .card {
   background: #fff;
   color: #121b2d;
