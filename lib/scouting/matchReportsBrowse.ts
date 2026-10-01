@@ -3,6 +3,29 @@
 // and returns each one's full home/away breakdown for browsing.
 import { createPsimServerClient } from "../supabase/psimServerClient";
 
+const PAGE_SIZE = 1000;
+
+/**
+ * Supabase/PostgREST silently caps an unbounded select() at 1000 rows — with
+ * enough match reports imported, tables like match_event_locations blow past
+ * that and the extra rows just vanish from the result with no error. This
+ * pages through with .range() (a fresh query per page, since a builder can't
+ * be re-awaited) until a short page signals the end.
+ */
+async function fetchAllRows<T>(queryFactory: () => { range(from: number, to: number): PromiseLike<{ data: T[] | null; error: { message: string } | null }> }): Promise<T[]> {
+  const all: T[] = [];
+  let from = 0;
+  for (;;) {
+    const { data, error } = await queryFactory().range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(error.message);
+    const rows = (data ?? []) as T[];
+    all.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return all;
+}
+
 export interface TeamMatchStatsSide {
   duration: number | null;
   scheme: string | null;
@@ -269,21 +292,21 @@ function firstClub(rel: RawMatch["home"]): { name: string; logo_url: string | nu
 export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
   const supabase = createPsimServerClient();
 
-  const { data: matches, error: matchesErr } = await supabase
-    .from("matches")
-    .select(
-      "id, match_date, competition, round, home_score, away_score, home_club_id, away_club_id, home:clubs!home_club_id(name, logo_url), away:clubs!away_club_id(name, logo_url)"
-    )
-    .order("match_date", { ascending: false });
-  if (matchesErr) throw new Error(`matches query failed: ${matchesErr.message}`);
+  const matches = await fetchAllRows<RawMatch>(() =>
+    supabase
+      .from("matches")
+      .select(
+        "id, match_date, competition, round, home_score, away_score, home_club_id, away_club_id, home:clubs!home_club_id(name, logo_url), away:clubs!away_club_id(name, logo_url)"
+      )
+      .order("match_date", { ascending: false })
+  );
 
-  const { data: statsRows, error: statsErr } = await supabase
-    .from("team_match_stats")
-    .select("club_id, match_date, duration, scheme, goals, xg, possession_pct, stats");
-  if (statsErr) throw new Error(`team_match_stats query failed: ${statsErr.message}`);
+  const statsRows = await fetchAllRows<RawStatsRow>(() =>
+    supabase.from("team_match_stats").select("club_id, match_date, duration, scheme, goals, xg, possession_pct, stats")
+  );
 
   const statsByKey = new Map<string, TeamMatchStatsSide>();
-  for (const r of (statsRows ?? []) as RawStatsRow[]) {
+  for (const r of statsRows) {
     statsByKey.set(`${r.club_id}:${r.match_date}`, {
       duration: r.duration,
       scheme: r.scheme,
@@ -294,34 +317,32 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     });
   }
 
-  const [
-    { data: segmentRows },
-    { data: comboRows },
-    { data: summaryRows },
-    { data: players },
-    { data: physicalRows },
-    { data: eventRows },
-    { data: lineupRows },
-    { data: eventLocationRows },
-    { data: formationLineupRows },
-  ] = await Promise.all([
-    supabase
-      .from("match_time_segments")
-      .select("match_id, club_id, segment, possession_pct, pass_accuracy_pct, long_pass_share_pct, duels_win_pct, attacks_per_min, recoveries_per_min, avg_formation_line_m, ppda"),
-    supabase.from("match_pass_combinations").select("match_id, from_player_id, to_player_id, pass_count"),
-    supabase.from("match_passing_summary").select("match_id, player_id, total_passes, def_third_pct, mid_third_pct, final_third_pct, x_pct, y_pct, jersey_number"),
-    supabase.from("players").select("id, name, club_id, photo_url"),
-    supabase
-      .from("player_physical_stats")
-      .select("match_id, player_id, total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count, top_speed_kmh, accelerations, decelerations, minutes_played"),
-    supabase
-      .from("match_events")
-      .select("match_id, club_id, event_type, player_id, player_name_raw, sub_in_player_id, sub_in_player_name_raw, minute"),
-    supabase.from("match_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, position_code"),
-    supabase
-      .from("match_event_locations")
-      .select("match_id, club_id, player_id, player_name_raw, jersey_number, kind, half, minute, shot_type, outcome, xg, psxg, leads_to_shot, x_pct, y_pct"),
-    supabase.from("match_formation_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, phase, x_pct, y_pct"),
+  const [segmentRows, comboRows, summaryRows, players, physicalRows, eventRows, lineupRows, eventLocationRows, formationLineupRows] = await Promise.all([
+    fetchAllRows(() =>
+      supabase
+        .from("match_time_segments")
+        .select("match_id, club_id, segment, possession_pct, pass_accuracy_pct, long_pass_share_pct, duels_win_pct, attacks_per_min, recoveries_per_min, avg_formation_line_m, ppda")
+    ),
+    fetchAllRows(() => supabase.from("match_pass_combinations").select("match_id, from_player_id, to_player_id, pass_count")),
+    fetchAllRows(() =>
+      supabase.from("match_passing_summary").select("match_id, player_id, total_passes, def_third_pct, mid_third_pct, final_third_pct, x_pct, y_pct, jersey_number")
+    ),
+    fetchAllRows(() => supabase.from("players").select("id, name, club_id, photo_url")),
+    fetchAllRows(() =>
+      supabase
+        .from("player_physical_stats")
+        .select("match_id, player_id, total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count, top_speed_kmh, accelerations, decelerations, minutes_played")
+    ),
+    fetchAllRows(() =>
+      supabase.from("match_events").select("match_id, club_id, event_type, player_id, player_name_raw, sub_in_player_id, sub_in_player_name_raw, minute")
+    ),
+    fetchAllRows(() => supabase.from("match_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, position_code")),
+    fetchAllRows(() =>
+      supabase
+        .from("match_event_locations")
+        .select("match_id, club_id, player_id, player_name_raw, jersey_number, kind, half, minute, shot_type, outcome, xg, psxg, leads_to_shot, x_pct, y_pct")
+    ),
+    fetchAllRows(() => supabase.from("match_formation_lineups").select("match_id, club_id, player_id, player_name_raw, jersey_number, phase, x_pct, y_pct")),
   ]);
 
   const playerById = new Map(((players ?? []) as RawPlayer[]).map((p) => [p.id, p]));
