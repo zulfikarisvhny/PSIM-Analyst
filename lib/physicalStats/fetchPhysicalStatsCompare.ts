@@ -1,9 +1,11 @@
 // lib/physicalStats/fetchPhysicalStatsCompare.ts
 // Server-only. Backs the GPS training-data comparison page: lists every
 // imported session (for the two pickers) and, given a pair of them, matches
-// players across both by player_id and lines their whole-session totals up
-// side by side. Only Team Summary rows (drill IS NULL) are compared — the
-// per-drill breakdown is for reviewing one session, not comparing two.
+// players across both by player_id and lines their totals up side by side.
+// `scope: null` compares Team Summary (whole-session) rows; a drill name
+// compares just that period instead — meaningful once drills are named
+// consistently across sessions (e.g. always "1st GAME"), which the import
+// preview's rename field is for.
 import { createPsimServerClient } from "../supabase/psimServerClient";
 
 export interface PhysicalStatsSessionOption {
@@ -89,20 +91,39 @@ function average(list: SideStats[]): SideStats | null {
   return out;
 }
 
-export async function fetchPhysicalStatsCompare(
+/** Drill names available for a session pair — the same name has to appear on both sides to be worth comparing. */
+export async function fetchPhysicalStatsDrillOptions(
   a: { sessionDate: string; sessionType: string },
   b: { sessionDate: string; sessionType: string }
+): Promise<string[]> {
+  const supabase = createPsimServerClient();
+  const { data, error } = await supabase
+    .from("player_physical_stats")
+    .select("session_date, session_type, drill")
+    .not("drill", "is", null)
+    .in("session_date", [a.sessionDate, b.sessionDate]);
+  if (error) throw new Error(`player_physical_stats query failed: ${error.message}`);
+
+  const rows = (data ?? []) as { session_date: string; session_type: string; drill: string }[];
+  const inA = new Set(rows.filter((r) => r.session_date === a.sessionDate && r.session_type === a.sessionType).map((r) => r.drill));
+  const inB = new Set(rows.filter((r) => r.session_date === b.sessionDate && r.session_type === b.sessionType).map((r) => r.drill));
+  return [...inA].filter((d) => inB.has(d)).sort();
+}
+
+export async function fetchPhysicalStatsCompare(
+  a: { sessionDate: string; sessionType: string },
+  b: { sessionDate: string; sessionType: string },
+  scope: string | null
 ): Promise<PhysicalStatsCompareResult> {
   const supabase = createPsimServerClient();
 
-  const [{ data: rows, error }, { data: players }] = await Promise.all([
-    supabase
-      .from("player_physical_stats")
-      .select("player_id, session_date, session_type, total_distance_m, high_speed_running_m, sprint_distance_m, top_speed_kmh, accelerations, decelerations, minutes_played")
-      .is("drill", null)
-      .in("session_date", [a.sessionDate, b.sessionDate]),
-    supabase.from("players").select("id, name"),
-  ]);
+  let query = supabase
+    .from("player_physical_stats")
+    .select("player_id, session_date, session_type, total_distance_m, high_speed_running_m, sprint_distance_m, top_speed_kmh, accelerations, decelerations, minutes_played")
+    .in("session_date", [a.sessionDate, b.sessionDate]);
+  query = scope === null ? query.is("drill", null) : query.eq("drill", scope);
+
+  const [{ data: rows, error }, { data: players }] = await Promise.all([query, supabase.from("players").select("id, name")]);
   if (error) throw new Error(`player_physical_stats query failed: ${error.message}`);
 
   const playerById = new Map(((players ?? []) as { id: number; name: string }[]).map((p) => [p.id, p.name]));
