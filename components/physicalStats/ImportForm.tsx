@@ -37,6 +37,13 @@ interface CatapultPlayerRow {
   match: PlayerMatch;
 }
 
+type EditableField = "totalDistanceM" | "distPerMin" | "maxVelocityKmh" | "hsDistanceM" | "sprintDistanceM" | "playerLoad" | "accelerations" | "decelerations" | "totalJumps";
+
+/** A player can appear once per drill (Team Summary + every period), so edits are keyed per row, not just per player name. */
+function rowKeyFor(drill: string | null, playerNameRaw: string): string {
+  return `${drill ?? "__summary__"}::${playerNameRaw}`;
+}
+
 /** Groups a file's flat player-row list by drill, Team Summary (drill: null) first, then each drill in first-seen order. */
 function groupByDrill(players: CatapultPlayerRow[]): { drill: string | null; rows: CatapultPlayerRow[] }[] {
   const order: (string | null)[] = [];
@@ -87,6 +94,18 @@ function formatDuration(seconds: number | null): string {
   return [h, m, s].map((v) => String(v).padStart(2, "0")).join(":");
 }
 
+function EditableNum({ value, onChange, step = 1 }: { value: number | null; onChange: (v: number | null) => void; step?: number }) {
+  return (
+    <input
+      type="number"
+      step={step}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+      className="w-16 bg-white dark:bg-[#191a1d] border border-gray-200 dark:border-[#2a2b30] rounded px-1 py-0.5 text-right text-gray-900 dark:text-white"
+    />
+  );
+}
+
 function confidenceColor(confidence: PlayerMatch["confidence"]): string {
   if (confidence === "exact") return "text-emerald-600 dark:text-emerald-400";
   if (confidence === "none") return "text-red-500 dark:text-red-400";
@@ -107,6 +126,8 @@ export function ImportForm() {
   const [matchIdOverride, setMatchIdOverride] = useState<Record<string, number | null | "unset">>({});
   // fileName -> original drill name -> renamed drill name (Catapult's own drill/period names are often generic, e.g. "11 v 11")
   const [drillNameOverride, setDrillNameOverride] = useState<Record<string, Record<string, string>>>({});
+  // fileName -> rowKey -> field -> corrected value (GPS units occasionally spit out garbage for a player, e.g. a sensor glitch)
+  const [valueOverride, setValueOverride] = useState<Record<string, Record<string, Partial<Record<EditableField, number | null>>>>>({});
 
   async function handlePreview(e: React.FormEvent) {
     e.preventDefault();
@@ -133,6 +154,7 @@ export function ImportForm() {
         setPlayerIdOverride({});
         setMatchIdOverride({});
         setDrillNameOverride({});
+        setValueOverride({});
       }
     } catch {
       setError("Network error while uploading.");
@@ -158,6 +180,19 @@ export function ImportForm() {
     return drillNameOverride[fileName]?.[drill] ?? drill;
   }
 
+  function resolvedValue(fileName: string, drill: string | null, playerNameRaw: string, field: EditableField, original: number | null): number | null {
+    const override = valueOverride[fileName]?.[rowKeyFor(drill, playerNameRaw)]?.[field];
+    return override !== undefined ? override : original;
+  }
+
+  function setValue(fileName: string, drill: string | null, playerNameRaw: string, field: EditableField, value: number | null) {
+    const key = rowKeyFor(drill, playerNameRaw);
+    setValueOverride((prev) => ({
+      ...prev,
+      [fileName]: { ...prev[fileName], [key]: { ...prev[fileName]?.[key], [field]: value } },
+    }));
+  }
+
   async function handleImport() {
     if (!previews) return;
     const okReports = previews
@@ -165,7 +200,12 @@ export function ImportForm() {
       .map((p) => ({
         fileName: p.fileName,
         meta: { ...p.meta!, sessionType: sessionTypeOverride[p.fileName] ?? p.meta!.sessionType },
-        players: p.players!.map((pl) => ({ ...pl, playerId: resolvedPlayerId(p.fileName, pl), drill: resolvedDrillName(p.fileName, pl.drill) })),
+        players: p.players!.map((pl) => ({
+          ...pl,
+          ...(valueOverride[p.fileName]?.[rowKeyFor(pl.drill, pl.playerNameRaw)] ?? {}),
+          playerId: resolvedPlayerId(p.fileName, pl),
+          drill: resolvedDrillName(p.fileName, pl.drill),
+        })),
         matchId: resolvedMatchId(p),
       }));
     if (okReports.length === 0) return;
@@ -353,14 +393,55 @@ export function ImportForm() {
                                       )}
                                     </td>
                                     <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{formatDuration(pl.durationSeconds)}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.totalDistanceM ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.maxVelocityKmh ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.hsDistanceM ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.sprintDistanceM ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.playerLoad ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.accelerations ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.decelerations ?? "—"}</td>
-                                    <td className="pr-3 py-1 text-gray-700 dark:text-gray-300">{pl.totalJumps ?? "—"}</td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "totalDistanceM", pl.totalDistanceM)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "totalDistanceM", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        step={0.1}
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "maxVelocityKmh", pl.maxVelocityKmh)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "maxVelocityKmh", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "hsDistanceM", pl.hsDistanceM)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "hsDistanceM", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "sprintDistanceM", pl.sprintDistanceM)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "sprintDistanceM", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "playerLoad", pl.playerLoad)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "playerLoad", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "accelerations", pl.accelerations)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "accelerations", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "decelerations", pl.decelerations)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "decelerations", v)}
+                                      />
+                                    </td>
+                                    <td className="pr-3 py-1">
+                                      <EditableNum
+                                        value={resolvedValue(p.fileName, drill, pl.playerNameRaw, "totalJumps", pl.totalJumps)}
+                                        onChange={(v) => setValue(p.fileName, drill, pl.playerNameRaw, "totalJumps", v)}
+                                      />
+                                    </td>
                                     {drill === null && (
                                       <td className="py-1">
                                         <button
