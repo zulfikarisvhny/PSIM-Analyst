@@ -109,7 +109,17 @@ export function CompareTable({
               <tbody>
                 {rows.map((r) => (
                   <tr key={r.playerId} className="border-t border-gray-100 dark:border-[#2a2b30]">
-                    <td className="py-1.5 pl-3 pr-3 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">{r.playerName}</td>
+                    <td className="py-1.5 pl-3 pr-3 font-semibold text-gray-700 dark:text-gray-200 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        {r.photoUrl ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={r.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover shrink-0" />
+                        ) : (
+                          <span className="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#2a2b30] shrink-0" />
+                        )}
+                        {r.playerName}
+                      </div>
+                    </td>
                     <td className="text-right py-1.5 px-2 text-gray-900 dark:text-white">{fmt(r.a?.totalDistanceM ?? null)}</td>
                     <td className="text-right py-1.5 px-2 text-gray-900 dark:text-white">{fmt(r.b?.totalDistanceM ?? null)}</td>
                     <td className="text-right py-1.5 px-2">

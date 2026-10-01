@@ -49,6 +49,12 @@ export function CompareChart({
         return (
           <div key={r.playerId}>
             <div className="flex items-baseline gap-2 mb-1">
+              {r.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={r.photoUrl} alt="" className="w-6 h-6 rounded-full object-cover shrink-0 self-center" />
+              ) : (
+                <span className="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#2a2b30] shrink-0 self-center" />
+              )}
               <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">{r.playerName}</span>
               <span className="text-sm font-bold text-gray-900 dark:text-white">{fmt(bVal, decimals)}</span>
               {delta !== null && Math.abs(delta) >= 10 ** -decimals / 2 && (

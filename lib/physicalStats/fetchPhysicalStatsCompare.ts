@@ -45,6 +45,7 @@ export interface SideStats {
 export interface ComparePlayerRow {
   playerId: number;
   playerName: string;
+  photoUrl: string | null;
   a: SideStats | null;
   b: SideStats | null;
 }
@@ -123,10 +124,10 @@ export async function fetchPhysicalStatsCompare(
     .in("session_date", [a.sessionDate, b.sessionDate]);
   query = scope === null ? query.is("drill", null) : query.eq("drill", scope);
 
-  const [{ data: rows, error }, { data: players }] = await Promise.all([query, supabase.from("players").select("id, name")]);
+  const [{ data: rows, error }, { data: players }] = await Promise.all([query, supabase.from("players").select("id, name, photo_url")]);
   if (error) throw new Error(`player_physical_stats query failed: ${error.message}`);
 
-  const playerById = new Map(((players ?? []) as { id: number; name: string }[]).map((p) => [p.id, p.name]));
+  const playerById = new Map(((players ?? []) as { id: number; name: string; photo_url: string | null }[]).map((p) => [p.id, p]));
   const allRows = (rows ?? []) as RawRow[];
 
   const aByPlayer = new Map<number, SideStats>();
@@ -141,7 +142,8 @@ export async function fetchPhysicalStatsCompare(
   const compareRows: ComparePlayerRow[] = [...playerIds]
     .map((id) => ({
       playerId: id,
-      playerName: playerById.get(id) ?? `Player #${id}`,
+      playerName: playerById.get(id)?.name ?? `Player #${id}`,
+      photoUrl: playerById.get(id)?.photo_url ?? null,
       a: aByPlayer.get(id) ?? null,
       b: bByPlayer.get(id) ?? null,
     }))
