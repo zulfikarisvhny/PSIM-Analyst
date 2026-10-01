@@ -1,9 +1,20 @@
 // components/layout/Sidebar.tsx
 "use client";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
+
+const COLLAPSE_KEY = "psim-sidebar-collapsed";
+
+function IconChevronLeft() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="m15 18-6-6 6-6" />
+    </svg>
+  );
+}
 
 function IconHome() {
   return (
@@ -95,65 +106,114 @@ function isActive(pathname: string, item: NavItem): boolean {
   return (item.activePrefixes ?? []).some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
-function NavLink({ item, active }: { item: NavItem; active: boolean }) {
+function NavLink({ item, active, collapsed }: { item: NavItem; active: boolean; collapsed: boolean }) {
   const Icon = item.icon;
   return (
     <Link
       href={item.href}
-      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors ${
+      title={collapsed ? item.label : undefined}
+      className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-semibold transition-colors ${collapsed ? "justify-center" : ""} ${
         active ? "bg-blue-50 text-blue-700" : "text-gray-500 hover:bg-gray-50 hover:text-[#121b2d]"
       }`}
     >
       <Icon />
-      {item.label}
+      {!collapsed && item.label}
     </Link>
   );
 }
 
 export function Sidebar({ logoUrl }: { logoUrl: string | null }) {
   const pathname = usePathname();
+  const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // Read the saved preference after mount (not in the initial state) so the
+  // server-rendered markup always matches the client's first render —
+  // avoids a hydration mismatch for anyone who'd previously collapsed it.
+  useEffect(() => {
+    setMounted(true);
+    try {
+      setCollapsed(localStorage.getItem(COLLAPSE_KEY) === "1");
+    } catch {
+      // ignore — private browsing / storage disabled, just stays expanded
+    }
+  }, []);
+
+  function toggle() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }
 
   return (
-    <aside className="w-64 shrink-0 h-screen sticky top-0 bg-white border-r border-gray-200 flex flex-col">
-      <Link href="/" className="flex items-center gap-2.5 px-5 py-6">
-        <div className="w-9 h-9 rounded-lg border border-blue-100 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center overflow-hidden shrink-0">
-          {logoUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={logoUrl} alt="" className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-blue-600 font-extrabold text-[10px]">PSIM</span>
-          )}
-        </div>
-        <span className="text-[13px] font-extrabold text-[#121b2d] leading-tight">PSIM Intelligence Dashboard</span>
-      </Link>
+    <aside className={`${collapsed ? "w-16" : "w-64"} ${mounted ? "transition-[width] duration-150" : ""} shrink-0 h-screen sticky top-0 bg-white border-r border-gray-200 flex flex-col`}>
+      <div className={`flex items-center gap-2.5 px-5 py-6 ${collapsed ? "justify-center px-0" : ""}`}>
+        <Link href="/" className="flex items-center gap-2.5 min-w-0">
+          <div className="w-9 h-9 rounded-lg border border-blue-100 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center overflow-hidden shrink-0">
+            {logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-blue-600 font-extrabold text-[10px]">PSIM</span>
+            )}
+          </div>
+          {!collapsed && <span className="text-[13px] font-extrabold text-[#121b2d] leading-tight">PSIM Intelligence Dashboard</span>}
+        </Link>
+        {!collapsed && (
+          <button
+            type="button"
+            onClick={toggle}
+            title="Collapse sidebar"
+            className="ml-auto shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-gray-400 hover:text-[#121b2d] hover:bg-gray-50"
+          >
+            <IconChevronLeft />
+          </button>
+        )}
+      </div>
+      {collapsed && (
+        <button
+          type="button"
+          onClick={toggle}
+          title="Expand sidebar"
+          className="mx-auto mb-3 w-7 h-7 flex items-center justify-center rounded-md text-gray-400 hover:text-[#121b2d] hover:bg-gray-50 rotate-180"
+        >
+          <IconChevronLeft />
+        </button>
+      )}
 
-      <nav className="flex-1 overflow-y-auto px-3 pb-6 flex flex-col gap-6">
+      <nav className={`flex-1 overflow-y-auto pb-6 flex flex-col gap-6 ${collapsed ? "px-2" : "px-3"}`}>
         <div className="flex flex-col gap-0.5">
           {MAIN_ITEMS.map((item) => (
-            <NavLink key={item.href} item={item} active={isActive(pathname, item)} />
+            <NavLink key={item.href} item={item} active={isActive(pathname, item)} collapsed={collapsed} />
           ))}
         </div>
 
         <div>
-          <p className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Import Data</p>
+          {!collapsed && <p className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Import Data</p>}
           <div className="flex flex-col gap-0.5">
             {IMPORT_ITEMS.map((item) => (
-              <NavLink key={item.href} item={item} active={isActive(pathname, item)} />
+              <NavLink key={item.href} item={item} active={isActive(pathname, item)} collapsed={collapsed} />
             ))}
           </div>
         </div>
 
         <div>
-          <p className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Tools</p>
+          {!collapsed && <p className="px-3 mb-1.5 text-[10px] font-bold tracking-wider text-gray-400 uppercase">Tools</p>}
           <div className="flex flex-col gap-0.5">
             {TOOLS_ITEMS.map((item) => (
-              <NavLink key={item.href} item={item} active={isActive(pathname, item)} />
+              <NavLink key={item.href} item={item} active={isActive(pathname, item)} collapsed={collapsed} />
             ))}
           </div>
         </div>
       </nav>
 
-      <div className="px-5 py-4 border-t border-gray-100 flex items-center justify-between">
+      <div className={`px-5 py-4 border-t border-gray-100 flex items-center ${collapsed ? "flex-col gap-3 px-2" : "justify-between"}`}>
         <LogoutButton />
         <ThemeToggle />
       </div>
