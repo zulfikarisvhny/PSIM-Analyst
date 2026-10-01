@@ -70,8 +70,6 @@ const FEATURES: Feature[] = [
 export function PsimOverview({
   rows,
   psimRow,
-  teamRank,
-  teamPoints,
   styleStats,
   matchReports,
   lastSeason,
@@ -82,8 +80,6 @@ export function PsimOverview({
 }: {
   rows: LeagueTeamRow[];
   psimRow: LeagueTeamRow | undefined;
-  teamRank: number;
-  teamPoints: number;
   styleStats: TeamStyleRow[];
   matchReports: MatchReportDetail[];
   lastSeason: LastSeasonOverview | null;
@@ -99,25 +95,6 @@ export function PsimOverview({
       <div className={shell.grain} aria-hidden="true" />
 
       <div className="relative z-[1] max-w-[1500px] mx-auto px-3 sm:px-6 py-8">
-        <div className={`${shell.card} flex items-center gap-4 mb-8 p-5`}>
-          <div className="w-16 h-16 rounded-xl border-2 border-blue-100 bg-gradient-to-br from-blue-50 to-blue-100 flex items-center justify-center overflow-hidden shrink-0">
-            {psimRow?.logo_url ? (
-              <img src={psimRow.logo_url} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-blue-600 font-extrabold text-sm">PSIM</span>
-            )}
-          </div>
-          <div className="flex-1">
-            <h1 className="text-2xl font-extrabold text-[#121b2d]">PSIM Yogyakarta</h1>
-            <p className="text-gray-500 text-sm mt-0.5">BRI Super League</p>
-          </div>
-          {psimRow && (
-            <span className="text-xs px-3.5 py-1.5 rounded-full border border-gray-200 text-gray-500 shrink-0">
-              Rank {teamRank} · {teamPoints} Pts
-            </span>
-          )}
-        </div>
-
         {psimRow && <h2 className={`text-lg mb-4 ${shell.sectionTitle}`}>Overview</h2>}
 
         {psimRow && (

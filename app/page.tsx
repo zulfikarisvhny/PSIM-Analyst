@@ -26,16 +26,11 @@ export default async function HomePage() {
   ]);
 
   const psimRow = rows.find((r) => r.Team === PSIM);
-  const psimStanding = standings.find((s) => s.team === PSIM);
-  const teamRank = psimStanding ? standings.findIndex((s) => s.team === PSIM) + 1 : 0;
-  const teamPoints = psimStanding?.points ?? 0;
 
   return (
     <PsimOverview
       rows={rows}
       psimRow={psimRow}
-      teamRank={teamRank}
-      teamPoints={teamPoints}
       styleStats={styleStats}
       matchReports={matchReports}
       lastSeason={lastSeason}
