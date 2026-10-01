@@ -9,6 +9,8 @@
 // resolveIconColors.ts — and returns every filled/stroked shape's
 // device-space bounding box, which callers filter by size to find the
 // diagram outlines actually present in a given export.
+import type { TextItem } from "../pdf/textLayout";
+
 export interface PathBox {
   x1: number;
   y1: number;
@@ -70,14 +72,27 @@ export async function extractPathBoxes(pdfjsLib: any, page: any): Promise<PathBo
 
 /**
  * Finds the four "team x half" mini-pitch outlines on a Losses / Recoveries /
- * Key Passes / Crosses page: two side-by-side columns (home left, away
- * right, split at the page's horizontal midpoint) each with a 1st-half box
- * above a 2nd-half box. Matches by size (`w`/`h` within tolerance of the
- * page's own most common box footprint, since the four diagram boxes are the
- * only shapes repeated exactly four times) rather than a hardcoded size, so
- * it keeps working if a page's template changes the diagram's dimensions.
+ * Key Passes / Crosses page. The real layout is two STACKED ROWS, one per
+ * team (each team's own section header — "PSIM Yogyakarta", "Persita" — sits
+ * directly above its row), and *within* each row the two boxes are 1st half
+ * (left) then 2nd half (right) — confirmed against a real export where
+ * assuming the opposite split (columns = team, rows = half, as if it mirrored
+ * the POSITIONS page's layout) silently merged half of each team's events
+ * into the other team's data. Matches candidate boxes by size (`w`/`h`
+ * within tolerance of the page's own most common box footprint, since the
+ * four diagram boxes are the only shapes repeated exactly four times) rather
+ * than a hardcoded size, so it keeps working if a page's template changes
+ * the diagram's dimensions. Which row belongs to which team is resolved by
+ * proximity to that team's own name label (printed directly above its row)
+ * rather than assuming the home team is always on top — a report doesn't
+ * reliably order PSIM first regardless of true home/away status.
  */
-export function findEventDiagramBoxes(boxes: PathBox[], pageWidth: number): { home1st: PathBox; home2nd: PathBox; away1st: PathBox; away2nd: PathBox } | null {
+export function findEventDiagramBoxes(
+  boxes: PathBox[],
+  items: TextItem[],
+  homeTeamName: string | null,
+  awayTeamName: string | null
+): { home1st: PathBox; home2nd: PathBox; away1st: PathBox; away2nd: PathBox } | null {
   const key = (b: PathBox) => `${b.w.toFixed(0)}x${b.h.toFixed(0)}`;
   const counts = new Map<string, PathBox[]>();
   for (const b of boxes) {
@@ -89,10 +104,22 @@ export function findEventDiagramBoxes(boxes: PathBox[], pageWidth: number): { ho
   const group = [...counts.values()].find((g) => g.length === 4);
   if (!group) return null;
 
-  const mid = pageWidth / 2;
-  const home = group.filter((b) => b.x1 < mid).sort((a, b) => b.y1 - a.y1);
-  const away = group.filter((b) => b.x1 >= mid).sort((a, b) => b.y1 - a.y1);
-  if (home.length !== 2 || away.length !== 2) return null;
+  // Rows = team (PDF y increases upward, so the higher y1 pair is the top row); within each row, left (lower x1) = 1st half, right = 2nd half.
+  const byY = [...group].sort((a, b) => b.y1 - a.y1);
+  const topRow = byY.slice(0, 2).sort((a, b) => a.x1 - b.x1);
+  const bottomRow = byY.slice(2, 4).sort((a, b) => a.x1 - b.x1);
+  if (topRow.length !== 2 || bottomRow.length !== 2) return null;
 
-  return { home1st: home[0], home2nd: home[1], away1st: away[0], away2nd: away[1] };
+  const topEdge = Math.max(topRow[0].y2, topRow[1].y2);
+  const homeLabelY = homeTeamName ? items.find((it) => it.str === homeTeamName)?.y ?? null : null;
+  const awayLabelY = awayTeamName ? items.find((it) => it.str === awayTeamName)?.y ?? null : null;
+  // A team's name label sits above its own row, so its y (PDF-up) should be >= that row's top edge; the closer label (smaller gap) identifies the row.
+  const homeGap = homeLabelY !== null && homeLabelY >= topEdge ? homeLabelY - topEdge : Infinity;
+  const awayGap = awayLabelY !== null && awayLabelY >= topEdge ? awayLabelY - topEdge : Infinity;
+  const topIsHome = homeGap <= awayGap; // defaults to true (home on top) if neither label was found
+
+  const homeRow = topIsHome ? topRow : bottomRow;
+  const awayRow = topIsHome ? bottomRow : topRow;
+
+  return { home1st: homeRow[0], home2nd: homeRow[1], away1st: awayRow[0], away2nd: awayRow[1] };
 }

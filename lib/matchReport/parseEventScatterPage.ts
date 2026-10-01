@@ -24,7 +24,10 @@ const YELLOW_MAX_DIST = 6;
 
 function toPct(x: number, y: number, box: PathBox): { xPct: number; yPct: number } {
   const xPct = ((x - box.x1) / (box.x2 - box.x1)) * 100;
-  const yPct = ((y - box.y1) / (box.y2 - box.y1)) * 100;
+  // PDF y increases upward; screen/SVG % increases downward — same flip as
+  // parseAveragePositions.ts's toPct. Missing this here put every event's
+  // row at the mirror-opposite side of the pitch width.
+  const yPct = ((box.y2 - y) / (box.y2 - box.y1)) * 100;
   return { xPct: Math.max(0, Math.min(100, xPct)), yPct: Math.max(0, Math.min(100, yPct)) };
 }
 

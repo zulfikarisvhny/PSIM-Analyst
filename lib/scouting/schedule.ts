@@ -16,6 +16,7 @@ export interface ScheduleTraining {
   date: string; // yyyy-mm-dd
   category: string | null;
   notes: string | null;
+  timeOfDay: "morning" | "early_afternoon" | "afternoon" | "evening" | null;
 }
 
 export interface ScheduleData {
@@ -37,7 +38,7 @@ export async function fetchSchedule(clubName: string): Promise<ScheduleData> {
 
   const { data: trainingRows, error: trainingErr } = await supabase
     .from("training_sessions")
-    .select("session_date, category, notes")
+    .select("session_date, category, notes, time_of_day")
     .eq("club_id", club.id)
     .order("session_date", { ascending: true });
   if (trainingErr) throw new Error(`training_sessions query failed: ${trainingErr.message}`);
@@ -59,6 +60,7 @@ export async function fetchSchedule(clubName: string): Promise<ScheduleData> {
     date: t.session_date,
     category: t.category,
     notes: t.notes,
+    timeOfDay: t.time_of_day,
   }));
 
   return { matches, training };

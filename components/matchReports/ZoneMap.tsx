@@ -4,9 +4,11 @@ import { useState } from "react";
 
 const PSIM = "PSIM Yogyakarta";
 
-interface ZoneEvent {
+export interface ZoneEvent {
   xPct: number; // 0-100, that team's own attack direction (own goal = 0, opponent goal = 100)
   yPct: number; // 0-100, touchline to touchline
+  playerName: string;
+  jersey: number | null;
 }
 
 const PITCH_LINE = { stroke: "white", strokeOpacity: 0.45, strokeWidth: 0.35, fill: "none" } as const;
@@ -25,46 +27,108 @@ function FullPitchMarkings() {
   );
 }
 
-// Thirds along the attack direction (defensive / middle / final), channels across the width (left / center / right).
-const X_BOUNDS = [0, 35, 70, 105];
-const Y_BOUNDS = [0, 22.67, 45.33, 68];
-const THIRD_LABELS = ["Defensive third", "Middle third", "Final third"];
+// 6 columns along the attack direction x 3 rows across the width = 18 zones,
+// numbered column-major (1-3 in column 1, 4-6 in column 2, ...) to match the
+// reference layout.
+const COLS = 6;
+const ROWS = 3;
+const X_BOUNDS = Array.from({ length: COLS + 1 }, (_, i) => (i * 105) / COLS);
+const Y_BOUNDS = Array.from({ length: ROWS + 1 }, (_, i) => (i * 68) / ROWS);
 
-function TeamZoneMap({ kind, events }: { kind: "loss" | "recovery"; events: ZoneEvent[] }) {
+function zoneOf(e: ZoneEvent): { col: number; row: number } {
+  const col = Math.min(COLS - 1, Math.floor((e.xPct / 100) * COLS));
+  const row = Math.min(ROWS - 1, Math.floor((e.yPct / 100) * ROWS));
+  return { col, row };
+}
+
+export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "recovery"; events: ZoneEvent[]; matchesCount?: number }) {
+  const [selected, setSelected] = useState<{ col: number; row: number } | null>(null);
+  const [mode, setMode] = useState<"total" | "average">("total");
+  const showToggle = !!matchesCount && matchesCount > 1;
+  const divisor = showToggle && mode === "average" ? matchesCount! : 1;
+
   if (events.length === 0) {
     return <p className="text-xs text-gray-500 dark:text-gray-400">No {kind === "loss" ? "loss" : "recovery"} location data available for this side.</p>;
   }
 
-  const grid: number[][] = [0, 1, 2].map(() => [0, 0, 0]); // grid[thirdIdx][channelIdx]
+  const grid: ZoneEvent[][][] = Array.from({ length: COLS }, () => Array.from({ length: ROWS }, () => [] as ZoneEvent[]));
   for (const e of events) {
-    const thirdIdx = Math.min(2, Math.floor((e.xPct / 100) * 3));
-    const channelIdx = Math.min(2, Math.floor((e.yPct / 100) * 3));
-    grid[thirdIdx][channelIdx]++;
+    const { col, row } = zoneOf(e);
+    grid[col][row].push(e);
   }
-  const maxCount = Math.max(...grid.flat(), 1);
+  const counts = grid.map((col) => col.map((cell) => cell.length));
+  const maxCount = Math.max(...counts.flat(), 1);
   const total = events.length;
   const color = kind === "loss" ? "239, 68, 68" : "34, 197, 94"; // red / green, as an "r, g, b" triplet for rgba()
 
+  const selectedEvents = selected ? grid[selected.col][selected.row] : [];
+  const playerRanking = (() => {
+    const byPlayer = new Map<string, number>();
+    for (const e of selectedEvents) byPlayer.set(e.playerName, (byPlayer.get(e.playerName) ?? 0) + 1);
+    return [...byPlayer.entries()].sort((a, b) => b[1] - a[1]);
+  })();
+
+  function fmt(n: number): string {
+    return divisor === 1 ? String(n) : (n / divisor).toFixed(1);
+  }
+
   return (
     <div>
-      <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">
-        {total} {kind === "loss" ? "losses" : "recoveries"} by zone. Darker = more events.
-      </p>
+      <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+        <p className="text-[11px] text-gray-500 dark:text-gray-400">
+          {fmt(total)} {kind === "loss" ? "losses" : "recoveries"} by zone{showToggle && mode === "average" ? ` (avg per match, ${matchesCount} matches)` : ""}. Click a zone for
+          detail.
+        </p>
+        {showToggle && (
+          <div className="flex items-center rounded-md border border-gray-200 dark:border-[#2a2b30] overflow-hidden text-[10px] font-semibold shrink-0">
+            {(["total", "average"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setMode(m)}
+                className={`px-2 py-1 capitalize ${
+                  mode === m ? "bg-blue-600 dark:bg-[#ffcf4d] text-white dark:text-[#0e0e10]" : "bg-white dark:bg-[#191a1d] text-gray-600 dark:text-gray-300"
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div className="relative w-full max-w-2xl mx-auto rounded-md overflow-hidden" style={{ aspectRatio: "105 / 68", background: "#5aa06a" }}>
         <svg className="absolute inset-0 w-full h-full" viewBox="0 0 105 68" preserveAspectRatio="none">
-          {grid.map((row, thirdIdx) =>
-            row.map((count, channelIdx) => {
-              const x0 = X_BOUNDS[thirdIdx];
-              const x1 = X_BOUNDS[thirdIdx + 1];
-              const y0 = Y_BOUNDS[channelIdx];
-              const y1 = Y_BOUNDS[channelIdx + 1];
-              const opacity = 0.12 + (count / maxCount) * 0.68;
+          {counts.map((col, colIdx) =>
+            col.map((count, rowIdx) => {
+              const x0 = X_BOUNDS[colIdx];
+              const x1 = X_BOUNDS[colIdx + 1];
+              const y0 = Y_BOUNDS[rowIdx];
+              const y1 = Y_BOUNDS[rowIdx + 1];
+              const isSelected = selected?.col === colIdx && selected?.row === rowIdx;
+              const dimmed = selected !== null && !isSelected;
+              const opacity = (0.12 + (count / maxCount) * 0.68) * (dimmed ? 0.35 : 1);
               const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+              const zoneNumber = colIdx * ROWS + rowIdx + 1;
               return (
-                <g key={`${thirdIdx}-${channelIdx}`}>
-                  <rect x={x0} y={y0} width={x1 - x0} height={y1 - y0} fill={`rgba(${color}, ${opacity})`} stroke="white" strokeOpacity={0.25} strokeWidth={0.2} />
+                <g
+                  key={`${colIdx}-${rowIdx}`}
+                  onClick={() => setSelected(isSelected ? null : { col: colIdx, row: rowIdx })}
+                  style={{ cursor: "pointer" }}
+                >
+                  <rect
+                    x={x0}
+                    y={y0}
+                    width={x1 - x0}
+                    height={y1 - y0}
+                    fill={`rgba(${color}, ${opacity})`}
+                    stroke={isSelected ? "#facc15" : "white"}
+                    strokeOpacity={isSelected ? 1 : 0.25}
+                    strokeWidth={isSelected ? 0.6 : 0.2}
+                  />
+                  <text x={x0 + 1.2} y={y0 + 2.8} fontSize={2} fill="white" fillOpacity={0.6}>
+                    {zoneNumber}
+                  </text>
                   <text x={(x0 + x1) / 2} y={(y0 + y1) / 2 - 1.2} textAnchor="middle" fontSize={4.2} fontWeight="700" fill="white">
-                    {count}
+                    {fmt(count)}
                   </text>
                   <text x={(x0 + x1) / 2} y={(y0 + y1) / 2 + 3.2} textAnchor="middle" fontSize={2.6} fill="white" fillOpacity={0.85}>
                     {pct}%
@@ -74,13 +138,34 @@ function TeamZoneMap({ kind, events }: { kind: "loss" | "recovery"; events: Zone
             })
           )}
           <FullPitchMarkings />
+          {selected &&
+            selectedEvents.map((e, i) => (
+              <circle key={i} cx={(e.xPct / 100) * 105} cy={(e.yPct / 100) * 68} r={1} fill="#facc15" stroke="#1f2937" strokeWidth={0.2}>
+                <title>{e.playerName}</title>
+              </circle>
+            ))}
         </svg>
       </div>
-      <div className="flex items-center justify-between max-w-2xl mx-auto mt-1.5 text-[10px] text-gray-500 dark:text-gray-400 px-1">
-        {THIRD_LABELS.map((label) => (
-          <span key={label}>{label}</span>
-        ))}
-      </div>
+
+      {selected && (
+        <div className="max-w-2xl mx-auto mt-2 p-3 rounded-md border border-gray-200 dark:border-[#2a2b30]">
+          <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5">
+            Zone {selected.col * ROWS + selected.row + 1} — {fmt(selectedEvents.length)} {kind === "loss" ? "losses" : "recoveries"}
+          </p>
+          {playerRanking.length === 0 ? (
+            <p className="text-[11px] text-gray-400">No events in this zone.</p>
+          ) : (
+            <div className="flex flex-col gap-1">
+              {playerRanking.map(([name, count]) => (
+                <div key={name} className="flex items-center justify-between text-[11px]">
+                  <span className="text-gray-700 dark:text-gray-200 truncate">{name}</span>
+                  <span className="font-semibold text-gray-900 dark:text-white shrink-0 ml-2">{fmt(count)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -91,12 +176,16 @@ export function ZoneMap({
   awayTeam,
   homeEvents,
   awayEvents,
+  homeMatchesCount,
+  awayMatchesCount,
 }: {
   kind: "loss" | "recovery";
   homeTeam: string;
   awayTeam: string;
   homeEvents: ZoneEvent[];
   awayEvents: ZoneEvent[];
+  homeMatchesCount?: number;
+  awayMatchesCount?: number;
 }) {
   const [side, setSide] = useState<"home" | "away">(awayTeam === PSIM ? "away" : "home");
   return (
@@ -119,7 +208,11 @@ export function ZoneMap({
           {awayTeam}
         </button>
       </div>
-      <TeamZoneMap kind={kind} events={side === "home" ? homeEvents : awayEvents} />
+      {side === "home" ? (
+        <TeamZoneMap kind={kind} events={homeEvents} matchesCount={homeMatchesCount} />
+      ) : (
+        <TeamZoneMap kind={kind} events={awayEvents} matchesCount={awayMatchesCount} />
+      )}
     </div>
   );
 }

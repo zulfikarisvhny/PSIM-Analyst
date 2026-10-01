@@ -13,6 +13,7 @@ export const STYLE_METRICS: { key: StyleMetricKey; label: string; decimals: numb
   { key: "proactiveDefPct", label: "Proactive Defending", decimals: 1, suffix: "%" },
   { key: "stepOutPct", label: "Step-Out Rate", decimals: 1, suffix: "%" },
   { key: "aerialPct", label: "Aerial Tendency", decimals: 1, suffix: "%" },
+  { key: "finalThirdEntriesPerMatch", label: "Final Third Entries", decimals: 1 },
 ];
 
 /** Share of a pool at or below `value` — a 0-100 percentile rank. */

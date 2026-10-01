@@ -5,7 +5,7 @@ import { TimeSegmentChart } from "./TimeSegmentChart";
 import { PassCombinationMatrix, TeamMatrix } from "./PassCombinationMatrix";
 import { PassNetworkPitch } from "./PassNetworkPitch";
 import { ShotMap } from "./ShotMap";
-import { ZoneMap } from "./ZoneMap";
+import { ZoneMap, TeamZoneMap, type ZoneEvent } from "./ZoneMap";
 import { PhysicalStatsTable } from "./PhysicalStatsTable";
 import { FormationLineupPitch } from "./FormationLineupPitch";
 import { AccuracyDonuts } from "./AccuracyDonuts";
@@ -172,6 +172,9 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
   // pairs wouldn't mean anything.
   const passPlayers = new Map<number, PassNetworkPlayer>();
   const passEdges = new Map<string, PassNetworkEdge>();
+  const losses: ZoneEvent[] = [];
+  const recoveries: ZoneEvent[] = [];
+  let eventLocMatches = 0;
 
   for (const r of reports) {
     const isPsimHome = r.homeTeam === PSIM;
@@ -227,6 +230,16 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
         else passEdges.set(key, { ...e });
       }
     }
+
+    if (r.eventLocations) {
+      const psimEvents = isPsimHome ? r.eventLocations.home : r.eventLocations.away;
+      if (psimEvents.length > 0) eventLocMatches++;
+      for (const e of psimEvents) {
+        const zoneEvent: ZoneEvent = { xPct: e.xPct, yPct: e.yPct, playerName: e.playerName, jersey: e.jersey };
+        if (e.kind === "loss") losses.push(zoneEvent);
+        else if (e.kind === "recovery") recoveries.push(zoneEvent);
+      }
+    }
   }
 
   const avg = (sum: number, count: number) => (count > 0 ? Math.round((sum / count) * 100) / 100 : null);
@@ -255,6 +268,9 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
       players: [...passPlayers.values()].sort((a, b) => b.totalPasses - a.totalPasses),
       edges: [...passEdges.values()],
     } as TeamPassNetwork,
+    losses,
+    recoveries,
+    eventLocMatches,
   };
 }
 
@@ -495,7 +511,24 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
           </div>
 
           {overallTab === "dynamics" && (
-            <TimeSegmentChart homeTeam="PSIM average" awayTeam="Opponents average" home={aggregate.timeSegments.home} away={aggregate.timeSegments.away} />
+            <div className="flex flex-col gap-6">
+              <TimeSegmentChart homeTeam="PSIM average" awayTeam="Opponents average" home={aggregate.timeSegments.home} away={aggregate.timeSegments.away} />
+              {(aggregate.losses.length > 0 || aggregate.recoveries.length > 0) && (
+                <>
+                  <div className="border-t border-gray-200 dark:border-[#2a2b30]" />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">PSIM Losses by zone — season</h4>
+                      <TeamZoneMap kind="loss" events={aggregate.losses} matchesCount={aggregate.eventLocMatches} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">PSIM Recoveries by zone — season</h4>
+                      <TeamZoneMap kind="recovery" events={aggregate.recoveries} matchesCount={aggregate.eventLocMatches} />
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
           )}
           {overallTab === "passing" && <TeamMatrix team={aggregate.passNetwork} teamName="PSIM Yogyakarta" />}
         </div>

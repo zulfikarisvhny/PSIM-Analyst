@@ -3,9 +3,9 @@ import type { PsimStandingRow } from "@/lib/scouting/psimStandings";
 
 export function LeagueStandingsCard({ standings, focusTeam }: { standings: PsimStandingRow[]; focusTeam: string }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-[20px] p-5 h-full flex flex-col">
+    <div className="bg-white border border-gray-200 rounded-[20px] p-5">
       <h3 className="text-sm font-medium text-[#121b2d] mb-3">BRI Super League 2026/2027</h3>
-      <div className="flex-1 overflow-y-auto overflow-x-auto max-h-[260px] -mx-1 px-1">
+      <div className="max-h-[260px] overflow-y-auto overflow-x-auto -mx-1 px-1">
         <table className="w-full min-w-[360px] text-xs border-collapse">
           <thead>
             <tr className="text-gray-400 sticky top-0 bg-white">

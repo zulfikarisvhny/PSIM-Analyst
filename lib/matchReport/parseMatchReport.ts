@@ -415,9 +415,8 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
   async function parseScatterPage(pageNum: number, detectLeadsToShot: boolean): Promise<{ home: ScatterEvent[]; away: ScatterEvent[] }> {
     const page = await doc.getPage(pageNum);
     const items = await getPageItems(page);
-    const width = page.getViewport({ scale: 1 }).width;
     const pathBoxes = await extractPathBoxes(pdfjsLib, page);
-    const eventBoxes = findEventDiagramBoxes(pathBoxes, width);
+    const eventBoxes = findEventDiagramBoxes(pathBoxes, items, meta.homeTeam, meta.awayTeam);
     if (!eventBoxes) return { home: [], away: [] };
     const fills = detectLeadsToShot ? await extractIconFills(pdfjsLib, page) : [];
     return parseEventScatterPage(items, eventBoxes, fills, detectLeadsToShot);
