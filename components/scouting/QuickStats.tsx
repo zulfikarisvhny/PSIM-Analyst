@@ -181,7 +181,7 @@ export function QuickStats({
             {lastSeasonDiff !== null && (
               <div className="flex items-center gap-1.5 mt-2">
                 <span
-                  className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                  className={`inline-flex items-center gap-0.5 shrink-0 whitespace-nowrap text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                     isBetterThanLastSeason ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"
                   }`}
                 >
