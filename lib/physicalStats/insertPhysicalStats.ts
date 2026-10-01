@@ -1,13 +1,14 @@
 // lib/physicalStats/insertPhysicalStats.ts
 // Server-only. Writes to player_physical_stats using its current schema:
 // player_id + match_id (both FKs, both nullable), session_date, session_type,
-// total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count,
-// top_speed_kmh, accelerations, decelerations, player_load, minutes_played,
-// notes. There's no player_name_raw/club_id/drill/total_jumps/running_imbalance
-// column anymore, so the raw Catapult name + jumps + imbalance (still useful,
-// just unmodeled) go into `notes` instead of being silently dropped.
-// sprint_count and player_load aren't present in the Team Summary table this
-// parser reads, so they're always null here.
+// drill, total_distance_m, high_speed_running_m, sprint_distance_m,
+// sprint_count, top_speed_kmh, accelerations, decelerations, player_load,
+// minutes_played, notes. There's no player_name_raw/club_id/total_jumps/
+// running_imbalance column, so the raw Catapult name + jumps + imbalance
+// (still useful, just unmodeled) go into `notes` instead of being silently
+// dropped. sprint_count isn't present anywhere in this report, so it's
+// always null; player_load is only present in per-drill rows (null for the
+// Team Summary row, same as the PDF itself).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { CatapultSessionMeta, CatapultPlayerRow } from "./parseCatapultReport";
 
@@ -61,6 +62,7 @@ export async function insertPhysicalStats(
     match_id: matchId,
     session_date: sessionDateIso,
     session_type: sessionType,
+    drill: p.drill,
     total_distance_m: p.totalDistanceM,
     high_speed_running_m: p.hsDistanceM,
     sprint_distance_m: p.sprintDistanceM,
@@ -68,7 +70,7 @@ export async function insertPhysicalStats(
     top_speed_kmh: p.maxVelocityKmh,
     accelerations: p.accelerations,
     decelerations: p.decelerations,
-    player_load: null,
+    player_load: p.playerLoad,
     minutes_played: p.durationSeconds !== null ? Math.round((p.durationSeconds / 60) * 10) / 10 : null,
     notes: buildNotes(p),
   }));
