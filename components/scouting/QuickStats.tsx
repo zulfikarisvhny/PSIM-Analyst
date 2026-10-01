@@ -181,14 +181,14 @@ export function QuickStats({
             {lastSeasonDiff !== null && (
               <div className="flex items-center gap-1.5 mt-2">
                 <span
-                  className={`inline-flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                  className={`inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
                     isBetterThanLastSeason ? "bg-emerald-100 text-emerald-700" : "bg-red-100 text-red-600"
                   }`}
                 >
                   {lastSeasonDiff >= 0 ? "▲" : "▼"} {Math.abs(lastSeasonDiff).toFixed(stat.decimals)}
                   {stat.unit}
                 </span>
-                <span className="text-[10px] text-gray-400">From PSIM last season</span>
+                <span className="text-[9px] text-gray-400">From PSIM last season</span>
               </div>
             )}
 
