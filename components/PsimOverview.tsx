@@ -98,7 +98,7 @@ export function PsimOverview({
         {psimRow && <h2 className={`text-lg mb-4 ${shell.sectionTitle}`}>Overview</h2>}
 
         {psimRow && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 mb-10 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 mb-10 items-stretch">
             <div className="flex flex-col gap-4">
               <QuickStats rows={rows} focusTeam={PSIM} lastSeason={lastSeason} seasonStatComparison={seasonStatComparison} />
               <LeagueStandingsCard standings={standings} focusTeam={PSIM} />

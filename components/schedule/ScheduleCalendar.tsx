@@ -97,7 +97,7 @@ export function ScheduleCalendar({ data }: { data: ScheduleData }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-[20px] p-4 flex flex-col">
+    <div className="bg-white border border-gray-200 rounded-[20px] p-4 h-full flex flex-col">
       <div className="flex items-center justify-between mb-2">
         <h3 className="text-sm font-medium text-[#121b2d]">Schedule</h3>
         <Link href="/schedule" className="text-xs font-semibold text-gray-400 hover:text-blue-600">
@@ -201,6 +201,9 @@ export function ScheduleCalendar({ data }: { data: ScheduleData }) {
           );
         })}
       </div>
+
+      {/* Absorbs any extra height the card is stretched to (e.g. to match a taller sibling card in the dashboard grid) so the footer/detail sections below stay anchored at their natural size instead of spreading out. */}
+      <div className="flex-1" />
 
       <div className="grid grid-cols-2 gap-3 pt-2 border-t border-gray-100 text-xs">
         <div>
