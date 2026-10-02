@@ -8,6 +8,7 @@ export interface ZoneEvent {
   xPct: number; // 0-100, that team's own attack direction (own goal = 0, opponent goal = 100)
   yPct: number; // 0-100, touchline to touchline
   playerName: string;
+  photoUrl: string | null;
   jersey: number | null;
 }
 
@@ -62,16 +63,21 @@ export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "re
   const color = kind === "loss" ? "239, 68, 68" : "34, 197, 94"; // red / green, as an "r, g, b" triplet for rgba()
 
   const selectedEvents = selected ? grid[selected.col][selected.row] : [];
-  const playerRanking = (() => {
-    const byPlayer = new Map<string, number>();
-    for (const e of selectedEvents) byPlayer.set(e.playerName, (byPlayer.get(e.playerName) ?? 0) + 1);
-    return [...byPlayer.entries()].sort((a, b) => b[1] - a[1]);
-  })();
-  const topPlayers = (() => {
-    const byPlayer = new Map<string, number>();
-    for (const e of events) byPlayer.set(e.playerName, (byPlayer.get(e.playerName) ?? 0) + 1);
-    return [...byPlayer.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
-  })();
+
+  function rankPlayers(list: ZoneEvent[]): { name: string; photoUrl: string | null; count: number }[] {
+    const byPlayer = new Map<string, { photoUrl: string | null; count: number }>();
+    for (const e of list) {
+      const entry = byPlayer.get(e.playerName) ?? { photoUrl: e.photoUrl, count: 0 };
+      entry.count++;
+      byPlayer.set(e.playerName, entry);
+    }
+    return [...byPlayer.entries()]
+      .map(([name, v]) => ({ name, photoUrl: v.photoUrl, count: v.count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+  }
+
+  const topPlayers = selected ? rankPlayers(selectedEvents) : rankPlayers(events);
 
   function fmt(n: number): string {
     return divisor === 1 ? String(n) : (n / divisor).toFixed(1);
@@ -153,41 +159,44 @@ export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "re
       </div>
 
       <div className="max-w-2xl mx-auto mt-3">
-        <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Top 5 players</p>
-        <div className="flex flex-col gap-1">
-          {topPlayers.map(([name, count], i) => (
-            <div key={name} className="flex items-center gap-2 text-[11px]">
-              <span className="w-4 h-4 shrink-0 rounded-full bg-gray-100 dark:bg-[#2a2b30] text-gray-500 dark:text-gray-400 flex items-center justify-center text-[9px] font-bold">
-                {i + 1}
-              </span>
-              <span className="text-gray-700 dark:text-gray-200 truncate flex-1">{name}</span>
-              <span className="text-gray-900 dark:text-white shrink-0">
-                {fmt(count)} {kind === "loss" ? "losses" : "recoveries"}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {selected && (
-        <div className="max-w-2xl mx-auto mt-2 p-3 rounded-md border border-gray-200 dark:border-[#2a2b30]">
-          <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5">
-            Zone {selected.col * ROWS + selected.row + 1} — {fmt(selectedEvents.length)} {kind === "loss" ? "losses" : "recoveries"}
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
+            {selected ? `Top 5 — Zone ${selected.col * ROWS + selected.row + 1}` : "Top 5 players"}
           </p>
-          {playerRanking.length === 0 ? (
-            <p className="text-[11px] text-gray-400">No events in this zone.</p>
-          ) : (
-            <div className="flex flex-col gap-1">
-              {playerRanking.map(([name, count]) => (
-                <div key={name} className="flex items-center justify-between text-[11px]">
-                  <span className="text-gray-700 dark:text-gray-200 truncate">{name}</span>
-                  <span className="font-semibold text-gray-900 dark:text-white shrink-0 ml-2">{fmt(count)}</span>
-                </div>
-              ))}
-            </div>
+          {selected && (
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="text-[10px] font-semibold text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              Clear ✕
+            </button>
           )}
         </div>
-      )}
+        {topPlayers.length === 0 ? (
+          <p className="text-[11px] text-gray-400">No events in this zone.</p>
+        ) : (
+          <div className="flex flex-col gap-1">
+            {topPlayers.map((p, i) => (
+              <div key={p.name} className="flex items-center gap-2 text-[11px]">
+                <span className="w-4 h-4 shrink-0 rounded-full bg-gray-100 dark:bg-[#2a2b30] text-gray-500 dark:text-gray-400 flex items-center justify-center text-[9px] font-bold">
+                  {i + 1}
+                </span>
+                {p.photoUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={p.photoUrl} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                ) : (
+                  <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-[#2a2b30] shrink-0" />
+                )}
+                <span className="text-gray-700 dark:text-gray-200 truncate flex-1">{p.name}</span>
+                <span className="text-gray-900 dark:text-white shrink-0">
+                  {fmt(p.count)} {kind === "loss" ? "losses" : "recoveries"}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -92,6 +92,7 @@ interface LineupPlayerEntry {
 interface EventLocationEntry {
   playerId: number | null;
   playerName: string;
+  photoUrl: string | null;
   jersey: number | null;
   kind: "shot" | "loss" | "recovery" | "key_pass" | "cross";
   half: "1st" | "2nd" | null;
@@ -235,7 +236,7 @@ function buildSeasonAggregate(reports: MatchReportDetail[]) {
       const psimEvents = isPsimHome ? r.eventLocations.home : r.eventLocations.away;
       if (psimEvents.length > 0) eventLocMatches++;
       for (const e of psimEvents) {
-        const zoneEvent: ZoneEvent = { xPct: e.xPct, yPct: e.yPct, playerName: e.playerName, jersey: e.jersey };
+        const zoneEvent: ZoneEvent = { xPct: e.xPct, yPct: e.yPct, playerName: e.playerName, photoUrl: e.photoUrl, jersey: e.jersey };
         if (e.kind === "loss") losses.push(zoneEvent);
         else if (e.kind === "recovery") recoveries.push(zoneEvent);
       }

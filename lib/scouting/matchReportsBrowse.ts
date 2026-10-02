@@ -95,6 +95,7 @@ export interface LineupPlayerEntry {
 export interface EventLocationEntry {
   playerId: number | null;
   playerName: string;
+  photoUrl: string | null;
   jersey: number | null;
   kind: "shot" | "loss" | "recovery" | "key_pass" | "cross";
   half: "1st" | "2nd" | null;
@@ -417,6 +418,7 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     list.push({
       playerId: r.player_id,
       playerName: r.player_id ? playerById.get(r.player_id)?.name ?? r.player_name_raw : r.player_name_raw,
+      photoUrl: (r.player_id ? playerById.get(r.player_id)?.photo_url : null) ?? null,
       jersey: r.jersey_number,
       kind: r.kind,
       half: r.half,
