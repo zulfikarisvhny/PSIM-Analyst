@@ -146,6 +146,7 @@ export interface MatchReportDetail {
   timeSegments: { home: TimeSegmentRow[]; away: TimeSegmentRow[] } | null;
   passNetwork: { home: TeamPassNetwork; away: TeamPassNetwork } | null;
   psimPhysicalStats: PlayerPhysicalStat[] | null;
+  psimPhysicalHalves: { firstHalf: PlayerPhysicalStat[]; secondHalf: PlayerPhysicalStat[] } | null;
   goals: { home: GoalEntry[]; away: GoalEntry[] } | null;
   events: { home: MatchEventEntry[]; away: MatchEventEntry[] } | null;
   lineups: { home: LineupPlayerEntry[]; away: LineupPlayerEntry[] } | null;
@@ -272,6 +273,7 @@ interface RawFormationLineupRow {
 interface RawPhysicalRow {
   match_id: number;
   player_id: number;
+  drill: string | null;
   total_distance_m: number | null;
   high_speed_running_m: number | null;
   sprint_distance_m: number | null;
@@ -332,7 +334,7 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     fetchAllRows(() =>
       supabase
         .from("player_physical_stats")
-        .select("match_id, player_id, total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count, top_speed_kmh, accelerations, decelerations, minutes_played")
+        .select("match_id, player_id, drill, total_distance_m, high_speed_running_m, sprint_distance_m, sprint_count, top_speed_kmh, accelerations, decelerations, minutes_played")
     ),
     fetchAllRows(() =>
       supabase.from("match_events").select("match_id, club_id, event_type, player_id, player_name_raw, sub_in_player_id, sub_in_player_name_raw, minute")
@@ -351,12 +353,15 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
   // Keyed by "matchId:clubId" (not just matchId) so the per-match lookup below
   // can pull out only the PSIM side's rows, ignoring the opponent's.
   const physicalByKey = new Map<string, PlayerPhysicalStat[]>();
+  // Per-half breakdown (drill "1st Half" / "2nd Half") — matchday-only, kept
+  // separate from the whole-session Team Summary rows above so the existing
+  // summary table doesn't end up with 2-3x duplicate rows per player.
+  const physicalHalvesByKey = new Map<string, { firstHalf: PlayerPhysicalStat[]; secondHalf: PlayerPhysicalStat[] }>();
   for (const r of (physicalRows ?? []) as RawPhysicalRow[]) {
     const player = playerById.get(r.player_id);
     if (!player) continue;
     const key = `${r.match_id}:${player.club_id}`;
-    const list = physicalByKey.get(key) ?? [];
-    list.push({
+    const stat: PlayerPhysicalStat = {
       playerId: r.player_id,
       name: player.name,
       totalDistanceM: r.total_distance_m,
@@ -367,11 +372,25 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
       accelerations: r.accelerations,
       decelerations: r.decelerations,
       minutesPlayed: r.minutes_played,
-    });
-    physicalByKey.set(key, list);
+    };
+
+    const drill = r.drill?.trim().toLowerCase() ?? null;
+    if (drill === null) {
+      const list = physicalByKey.get(key) ?? [];
+      list.push(stat);
+      physicalByKey.set(key, list);
+    } else if (drill === "1st half" || drill === "2nd half") {
+      const halves = physicalHalvesByKey.get(key) ?? { firstHalf: [], secondHalf: [] };
+      (drill === "1st half" ? halves.firstHalf : halves.secondHalf).push(stat);
+      physicalHalvesByKey.set(key, halves);
+    }
   }
   for (const list of physicalByKey.values()) {
     list.sort((a, b) => (b.totalDistanceM ?? 0) - (a.totalDistanceM ?? 0));
+  }
+  for (const halves of physicalHalvesByKey.values()) {
+    halves.firstHalf.sort((a, b) => (b.totalDistanceM ?? 0) - (a.totalDistanceM ?? 0));
+    halves.secondHalf.sort((a, b) => (b.totalDistanceM ?? 0) - (a.totalDistanceM ?? 0));
   }
 
   function minuteSortValue(minute: string): number {
@@ -534,6 +553,7 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     const awayTeam = awayName;
     const psimClubId = homeTeam === PSIM ? m.home_club_id : awayTeam === PSIM ? m.away_club_id : null;
     const psimPhysicalStats = psimClubId !== null ? physicalByKey.get(`${m.id}:${psimClubId}`) ?? null : null;
+    const psimPhysicalHalves = psimClubId !== null ? physicalHalvesByKey.get(`${m.id}:${psimClubId}`) ?? null : null;
 
     const goalsHome = goalsByKey.get(`${m.id}:${m.home_club_id}`) ?? [];
     const goalsAway = goalsByKey.get(`${m.id}:${m.away_club_id}`) ?? [];
@@ -574,6 +594,7 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
       timeSegments,
       passNetwork,
       psimPhysicalStats,
+      psimPhysicalHalves,
       goals,
       events,
       lineups,

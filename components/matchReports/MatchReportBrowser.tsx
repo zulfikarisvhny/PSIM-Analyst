@@ -7,6 +7,7 @@ import { PassNetworkPitch } from "./PassNetworkPitch";
 import { ShotMap } from "./ShotMap";
 import { ZoneMap, TeamZoneMap, type ZoneEvent } from "./ZoneMap";
 import { PhysicalStatsTable } from "./PhysicalStatsTable";
+import { PhysicalStatsHalfCompare } from "./PhysicalStatsHalfCompare";
 import { FormationLineupPitch } from "./FormationLineupPitch";
 import { AccuracyDonuts } from "./AccuracyDonuts";
 
@@ -130,6 +131,7 @@ interface MatchReportDetail {
   timeSegments: { home: TimeSegmentRow[]; away: TimeSegmentRow[] } | null;
   passNetwork: { home: TeamPassNetwork; away: TeamPassNetwork } | null;
   psimPhysicalStats: PlayerPhysicalStat[] | null;
+  psimPhysicalHalves: { firstHalf: PlayerPhysicalStat[]; secondHalf: PlayerPhysicalStat[] } | null;
   goals: { home: GoalEntry[]; away: GoalEntry[] } | null;
   events: { home: MatchEventEntry[]; away: MatchEventEntry[] } | null;
   lineups: { home: LineupPlayerEntry[]; away: LineupPlayerEntry[] } | null;
@@ -766,7 +768,18 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
 
                     {activeTab === "physical" && (
                       report.psimPhysicalStats ? (
-                        <PhysicalStatsTable players={report.psimPhysicalStats} />
+                        <div className="flex flex-col gap-6">
+                          <PhysicalStatsTable players={report.psimPhysicalStats} />
+                          {report.psimPhysicalHalves && (
+                            <>
+                              <div className="border-t border-gray-200 dark:border-[#2a2b30]" />
+                              <div>
+                                <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">1st Half vs 2nd Half</h4>
+                                <PhysicalStatsHalfCompare firstHalf={report.psimPhysicalHalves.firstHalf} secondHalf={report.psimPhysicalHalves.secondHalf} />
+                              </div>
+                            </>
+                          )}
+                        </div>
                       ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400">No physical stats data available.</p>
                       )
