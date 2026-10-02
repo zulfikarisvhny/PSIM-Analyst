@@ -5,6 +5,7 @@ import { NEW_SIGNEES } from "@/lib/scouting/squadUpdate";
 import { NEW_SIGNEES_BY_TEAM } from "@/lib/scouting/newSignees";
 import { MATCH_LOG_BY_TEAM } from "@/lib/scouting/matchlog";
 import { fetchTeamPassNetworkFromReports } from "@/lib/scouting/teamPassNetworkFromReports";
+import { fetchTeamFormations } from "@/lib/scouting/teamFormationsFromReports";
 import { ScoutingTabs } from "@/components/scouting/ScoutingTabs";
 
 // Cache the rendered page for 5 min so visits are served instantly instead of
@@ -25,17 +26,19 @@ export default async function ScoutingPage({
   const formationSignees = NEW_SIGNEES_BY_TEAM[focusTeam] ?? [];
   const formationSigneeNexusNames = formationSignees.map((s) => s.nexusName).filter((n): n is string => !!n);
 
-  // These 6 queries are independent — run them in parallel instead of one
+  // These 7 queries are independent — run them in parallel instead of one
   // sequential await each, which was serializing network round-trips to Supabase.
-  const [rows, players, leaguePositionAverages, leagueDefenderPool, incomingPlayers, formationSigneeNexusRows, realPassNetwork] = await Promise.all([
-    fetchLeagueTable(),
-    fetchTeamPlayers(focusTeam),
-    fetchLeaguePositionAverages(),
-    fetchLeaguePlayerProfilePool(),
-    fetchPlayersByExactName(newSigneeNames),
-    fetchPlayersByExactName(formationSigneeNexusNames),
-    fetchTeamPassNetworkFromReports(focusTeam),
-  ]);
+  const [rows, players, leaguePositionAverages, leagueDefenderPool, incomingPlayers, formationSigneeNexusRows, realPassNetwork, teamFormations] =
+    await Promise.all([
+      fetchLeagueTable(),
+      fetchTeamPlayers(focusTeam),
+      fetchLeaguePositionAverages(),
+      fetchLeaguePlayerProfilePool(),
+      fetchPlayersByExactName(newSigneeNames),
+      fetchPlayersByExactName(formationSigneeNexusNames),
+      fetchTeamPassNetworkFromReports(focusTeam),
+      fetchTeamFormations(focusTeam),
+    ]);
 
   // Signees with real Nexus history (found above) plus synthetic placeholder
   // rows (negative ids) for those with none at all — merged into the roster
@@ -104,6 +107,7 @@ export default async function ScoutingPage({
         leagueDefenderPool={leagueDefenderPool}
         incomingPlayers={incomingPlayers}
         realPassNetwork={realPassNetwork}
+        teamFormations={teamFormations}
       />
 
       {/* Tactical notes: pull from a future `scouting_intel` table once it exists;

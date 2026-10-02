@@ -15,6 +15,7 @@ import { TeamForm } from "./TeamForm";
 import { HeadToHead } from "./HeadToHead";
 import { FormationPitchCard } from "./FormationPitch";
 import { FormationMatrix } from "./FormationMatrix";
+import { TeamFormationHistory } from "./TeamFormationHistory";
 import { AveragePosition } from "./AveragePosition";
 import { TacticsBoard } from "./TacticsBoard";
 import { PassNetwork } from "./PassNetwork";
@@ -22,6 +23,7 @@ import { RealPassNetwork } from "./RealPassNetwork";
 import { RealAveragePosition } from "./RealAveragePosition";
 import { PASS_NETWORK_BY_TEAM } from "@/lib/scouting/passNetwork";
 import type { TeamPassNetworkResult } from "@/lib/scouting/teamPassNetworkFromReports";
+import type { TeamFormationMatch } from "@/lib/scouting/teamFormationsFromReports";
 import { AttackingQuality } from "./AttackingQuality";
 import { PlayerStats } from "./PlayerStats";
 import { SquadUpdate } from "./SquadUpdate";
@@ -50,6 +52,7 @@ export function ScoutingTabs({
   leagueDefenderPool,
   incomingPlayers,
   realPassNetwork,
+  teamFormations,
 }: {
   rows: LeagueTeamRow[];
   percentiles: Record<string, RadarPercentiles>;
@@ -68,19 +71,21 @@ export function ScoutingTabs({
   incomingPlayers: NexusPlayerRow[];
   leagueDefenderPool: PlayerProfileRow[];
   realPassNetwork: TeamPassNetworkResult | null;
+  teamFormations: TeamFormationMatch[];
 }) {
   const [activeTab, setActiveTab] = useState("overview");
   const router = useRouter();
 
   const passNetworkMatches = PASS_NETWORK_BY_TEAM[focusTeam];
   const hasRealPassNetwork = (realPassNetwork?.overall.players.length ?? 0) > 0;
+  const hasTeamFormations = teamFormations.length > 0;
 
   const TABS = [
     { id: "overview", label: "Overview", active: true },
     { id: "table", label: "Table", active: true },
     { id: "players", label: "Player Stats", active: true },
     { id: "stylemap", label: "Style Map", active: true },
-    { id: "formation", label: "Formation Analysis", active: hasMatchLog },
+    { id: "formation", label: "Formation Analysis", active: hasMatchLog || hasTeamFormations },
     { id: "avgpos", label: "Average Position", active: hasMatchLog || hasRealPassNetwork },
     { id: "passnetwork", label: "Passing Network", active: !!passNetworkMatches || hasRealPassNetwork },
     { id: "tacticsboard", label: "Tactics Board", active: true },
@@ -198,10 +203,15 @@ export function ScoutingTabs({
           </div>
         )}
 
-        {activeTab === "formation" && hasMatchLog && (
+        {activeTab === "formation" && (hasMatchLog || hasTeamFormations) && (
           <div className="flex flex-col gap-4">
-            <FormationPitchCard teamName={focusTeam} logoUrl={focusRow?.logo_url} players={formationPlayers} />
-            <FormationMatrix teamName={focusTeam} />
+            {hasTeamFormations && <TeamFormationHistory teamName={focusTeam} matches={teamFormations} />}
+            {hasMatchLog && (
+              <>
+                <FormationPitchCard teamName={focusTeam} logoUrl={focusRow?.logo_url} players={formationPlayers} />
+                <FormationMatrix teamName={focusTeam} />
+              </>
+            )}
           </div>
         )}
 
