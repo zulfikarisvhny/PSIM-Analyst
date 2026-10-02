@@ -2,6 +2,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import { Sidebar } from "./Sidebar";
+import { TopBar } from "./TopBar";
 
 export function AppShell({ logoUrl, children }: { logoUrl: string | null; children: React.ReactNode }) {
   const pathname = usePathname();
@@ -12,7 +13,10 @@ export function AppShell({ logoUrl, children }: { logoUrl: string | null; childr
   return (
     <div className="flex min-h-screen">
       <Sidebar logoUrl={logoUrl} />
-      <div className="flex-1 min-w-0">{children}</div>
+      <div className="flex-1 min-w-0">
+        <TopBar />
+        {children}
+      </div>
     </div>
   );
 }

@@ -1,12 +1,12 @@
 // components/DashboardPageShell.tsx
 // Shared wrapper for secondary dashboard pages (import forms, player
 // browser, admin, ...) — plain white background, with the standard
-// title + description header every one of these pages already had.
-// Navigation back to other pages lives in the sidebar (components/layout/Sidebar.tsx).
+// description text every one of these pages already had. The title itself
+// is shown by the global TopBar (components/layout/TopBar.tsx), which keys
+// off the route — keep its ROUTE_TITLES entry in sync with `title` here.
 import shell from "./DashboardShell.module.css";
 
 export function DashboardPageShell({
-  title,
   description,
   maxWidthClassName = "max-w-2xl",
   children,
@@ -19,7 +19,6 @@ export function DashboardPageShell({
   return (
     <main className={shell.page}>
       <div className={`relative z-[1] ${maxWidthClassName} mx-auto px-4 py-10`}>
-        <h1 className="text-xl font-extrabold text-[#121b2d] mb-1">{title}</h1>
         {description && <p className="text-sm text-gray-500 mb-6">{description}</p>}
         {children}
       </div>

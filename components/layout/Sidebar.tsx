@@ -163,7 +163,6 @@ export function Sidebar({ logoUrl }: { logoUrl: string | null }) {
               <span className="text-blue-600 font-extrabold text-[10px]">PSIM</span>
             )}
           </div>
-          {!collapsed && <span className="text-[13px] font-extrabold text-[#121b2d] leading-tight">PSIM Intelligence Dashboard</span>}
         </Link>
         {!collapsed && (
           <button
