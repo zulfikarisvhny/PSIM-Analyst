@@ -17,30 +17,43 @@ export type VideoCategory = (typeof VIDEO_CATEGORIES)[number];
 export interface VideoEmbed {
   provider: "youtube" | "drive" | "unknown";
   embedUrl: string | null;
+  /** YouTube's standard thumbnail JPEG — null for Drive/unknown (no public thumbnail without an API call). */
+  thumbnailUrl: string | null;
 }
+
+const YOUTUBE_PATTERNS = [
+  /youtu\.be\/([a-zA-Z0-9_-]{6,})/,
+  /youtube\.com\/watch\?(?:.*&)?v=([a-zA-Z0-9_-]{6,})/,
+  /youtube\.com\/embed\/([a-zA-Z0-9_-]{6,})/,
+  /youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/,
+];
 
 /** Turns a pasted YouTube/Google Drive share link into an iframe-embeddable URL. */
 export function getVideoEmbed(url: string): VideoEmbed {
   const trimmed = url.trim();
 
-  const youtubePatterns = [
-    /youtu\.be\/([a-zA-Z0-9_-]{6,})/,
-    /youtube\.com\/watch\?(?:.*&)?v=([a-zA-Z0-9_-]{6,})/,
-    /youtube\.com\/embed\/([a-zA-Z0-9_-]{6,})/,
-    /youtube\.com\/shorts\/([a-zA-Z0-9_-]{6,})/,
-  ];
-  for (const pattern of youtubePatterns) {
+  for (const pattern of YOUTUBE_PATTERNS) {
     const match = trimmed.match(pattern);
-    if (match) return { provider: "youtube", embedUrl: `https://www.youtube.com/embed/${match[1]}` };
+    if (match) {
+      return {
+        provider: "youtube",
+        embedUrl: `https://www.youtube.com/embed/${match[1]}`,
+        thumbnailUrl: `https://img.youtube.com/vi/${match[1]}/mqdefault.jpg`,
+      };
+    }
   }
 
   const driveFileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
-  if (driveFileMatch) return { provider: "drive", embedUrl: `https://drive.google.com/file/d/${driveFileMatch[1]}/preview` };
+  if (driveFileMatch) {
+    return { provider: "drive", embedUrl: `https://drive.google.com/file/d/${driveFileMatch[1]}/preview`, thumbnailUrl: null };
+  }
 
   const driveOpenMatch = trimmed.match(/drive\.google\.com\/open\?id=([a-zA-Z0-9_-]+)/);
-  if (driveOpenMatch) return { provider: "drive", embedUrl: `https://drive.google.com/file/d/${driveOpenMatch[1]}/preview` };
+  if (driveOpenMatch) {
+    return { provider: "drive", embedUrl: `https://drive.google.com/file/d/${driveOpenMatch[1]}/preview`, thumbnailUrl: null };
+  }
 
-  return { provider: "unknown", embedUrl: null };
+  return { provider: "unknown", embedUrl: null, thumbnailUrl: null };
 }
 
 export interface ParsedVideoEntry {
