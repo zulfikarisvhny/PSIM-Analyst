@@ -62,7 +62,11 @@ function parseSessionDate(items: TextItem[]): { printed: string | null; iso: str
 
 function parseSessionType(items: TextItem[]): string {
   const found = items.find((it) => SESSION_TYPES.includes(it.str.toLowerCase()));
-  return found ? found.str.toLowerCase() : "training";
+  if (found) return found.str.toLowerCase();
+  // Matchday reports title the page "LEAGUE VS <OPPONENT> <date>" — no
+  // standalone "match" token, but " vs " only ever shows up in that title.
+  if (items.some((it) => /\bvs\b/i.test(it.str))) return "match";
+  return "training";
 }
 
 /** Parses one Team Summary row's tokens, anchored from the right since the last 10 fields are always numeric/imbalance. */
