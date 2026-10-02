@@ -713,15 +713,15 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                                   awayTeam={report.awayTeam}
                                   homeEvents={report.eventLocations.home.filter((e) => e.kind === "loss")}
                                   awayEvents={report.eventLocations.away.filter((e) => e.kind === "loss")}
+                                  homeTypeBreakdown={LOSS_TYPE_KEYS.map(({ key, label }) => ({
+                                    label,
+                                    count: report.home?.stats[key] ? Number(report.home.stats[key]) : null,
+                                  }))}
+                                  awayTypeBreakdown={LOSS_TYPE_KEYS.map(({ key, label }) => ({
+                                    label,
+                                    count: report.away?.stats[key] ? Number(report.away.stats[key]) : null,
+                                  }))}
                                 />
-                                {(report.home?.stats["losses_type_forward_pass"] || report.away?.stats["losses_type_forward_pass"]) && (
-                                  <div className="mt-4 max-w-2xl mx-auto">
-                                    <h5 className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1">Losses type</h5>
-                                    {LOSS_TYPE_KEYS.map(({ key, label }) => (
-                                      <ComparisonRow key={key} label={label} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                               <div>
                                 <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">Recoveries by zone</h4>
@@ -731,15 +731,15 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                                   awayTeam={report.awayTeam}
                                   homeEvents={report.eventLocations.home.filter((e) => e.kind === "recovery")}
                                   awayEvents={report.eventLocations.away.filter((e) => e.kind === "recovery")}
+                                  homeTypeBreakdown={RECOVERY_TYPE_KEYS.map(({ key, label }) => ({
+                                    label,
+                                    count: report.home?.stats[key] ? Number(report.home.stats[key]) : null,
+                                  }))}
+                                  awayTypeBreakdown={RECOVERY_TYPE_KEYS.map(({ key, label }) => ({
+                                    label,
+                                    count: report.away?.stats[key] ? Number(report.away.stats[key]) : null,
+                                  }))}
                                 />
-                                {(report.home?.stats["recoveries_type_positioning"] || report.away?.stats["recoveries_type_positioning"]) && (
-                                  <div className="mt-4 max-w-2xl mx-auto">
-                                    <h5 className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1">Recoveries type</h5>
-                                    {RECOVERY_TYPE_KEYS.map(({ key, label }) => (
-                                      <ComparisonRow key={key} label={label} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
-                                    ))}
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </>
