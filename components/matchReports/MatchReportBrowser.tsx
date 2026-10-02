@@ -1,6 +1,7 @@
 // components/matchReports/MatchReportBrowser.tsx
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { exportSectionsToPdf } from "@/lib/pdfExport/exportSectionsToPdf";
 import { TimeSegmentChart } from "./TimeSegmentChart";
 import { PassCombinationMatrix, TeamMatrix } from "./PassCombinationMatrix";
 import { PassNetworkPitch } from "./PassNetworkPitch";
@@ -450,12 +451,66 @@ function TeamCrest({ url }: { url: string | null }) {
   return <div className="w-6 h-6 rounded-full bg-gray-100 dark:bg-[#2a2b30] shrink-0" />;
 }
 
+const MATCHDAY_TAB_LABELS: Record<"facts" | "lineup" | "stats" | "attackTypes" | "dynamics" | "passing" | "physical", string> = {
+  facts: "Facts",
+  lineup: "Lineup",
+  stats: "Stats",
+  attackTypes: "Attack Types & Set Pieces",
+  dynamics: "Match Dynamics",
+  passing: "Pass Combinations",
+  physical: "Physical Stats",
+};
+const OVERALL_TAB_LABELS: Record<"dynamics" | "passing", string> = {
+  dynamics: "Match Dynamics",
+  passing: "Pass Combinations",
+};
+
 export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }) {
   const [mode, setMode] = useState<"matchday" | "overall">("matchday");
   const [overallTab, setOverallTab] = useState<"dynamics" | "passing">("dynamics");
   const [expandedMatchId, setExpandedMatchId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"facts" | "lineup" | "stats" | "attackTypes" | "dynamics" | "passing" | "physical">("facts");
+  const [exportingMatchId, setExportingMatchId] = useState<number | null>(null);
+  const [exportingOverall, setExportingOverall] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const overallPanelRef = useRef<HTMLDivElement>(null);
   const aggregate = useMemo(() => buildSeasonAggregate(reports), [reports]);
+
+  async function handleDownloadMatchday(report: MatchReportDetail) {
+    setExpandedMatchId(report.matchId);
+    setExportingMatchId(report.matchId);
+    try {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const tabKeys = Object.keys(MATCHDAY_TAB_LABELS) as (keyof typeof MATCHDAY_TAB_LABELS)[];
+      await exportSectionsToPdf({
+        title: `${report.homeTeam} ${report.homeScore ?? "–"}–${report.awayScore ?? "–"} ${report.awayTeam}`,
+        subtitle: `${formatMatchDate(report.matchDate)}${report.round ? ` · ${gameWeekLabel(report.round)}` : ""}${report.competition ? ` · ${report.competition}` : ""}`,
+        sections: tabKeys.map((key) => ({ label: MATCHDAY_TAB_LABELS[key], activate: () => setActiveTab(key) })),
+        getElement: () => panelRef.current,
+        filename: `PSIM - ${report.homeTeam} vs ${report.awayTeam} - ${report.matchDate}.pdf`,
+      });
+    } finally {
+      setExportingMatchId(null);
+    }
+  }
+
+  async function handleDownloadOverall() {
+    setMode("overall");
+    setExportingOverall(true);
+    try {
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const tabKeys = Object.keys(OVERALL_TAB_LABELS) as (keyof typeof OVERALL_TAB_LABELS)[];
+      await exportSectionsToPdf({
+        title: "PSIM Yogyakarta — Season Overall",
+        subtitle: `Average across ${aggregate.matchesUsed} match${aggregate.matchesUsed === 1 ? "" : "es"} with imported reports`,
+        sections: tabKeys.map((key) => ({ label: OVERALL_TAB_LABELS[key], activate: () => setOverallTab(key) })),
+        getElement: () => overallPanelRef.current,
+        filename: `PSIM - Season Overall Report.pdf`,
+      });
+    } finally {
+      setExportingOverall(false);
+    }
+  }
 
   if (reports.length === 0) {
     return (
@@ -496,10 +551,18 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
           </button>
         </div>
 
+        <button
+          type="button"
+          onClick={handleDownloadOverall}
+          disabled={exportingOverall}
+          className="text-xs font-semibold text-blue-600 dark:text-[#ffcf4d] hover:underline disabled:opacity-50 ml-auto"
+        >
+          {exportingOverall ? "Exporting…" : "Download Overall PDF"}
+        </button>
       </div>
 
       {mode === "overall" && (
-        <div className="bg-white dark:bg-[#191a1d] border border-gray-200 dark:border-[#2a2b30] rounded-lg p-5">
+        <div ref={overallPanelRef} className="bg-white dark:bg-[#191a1d] border border-gray-200 dark:border-[#2a2b30] rounded-lg p-5">
           <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
             PSIM Yogyakarta average across {aggregate.matchesUsed} match{aggregate.matchesUsed === 1 ? "" : "es"} with imported reports, vs the average of
             the opponents faced.
@@ -580,6 +643,17 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                   </div>
                   <span className="text-gray-400 shrink-0 w-4 text-center">{isOpen ? "−" : "+"}</span>
                 </button>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadMatchday(report);
+                  }}
+                  disabled={exportingMatchId === report.matchId}
+                  className="shrink-0 self-center mr-4 text-xs font-semibold text-blue-600 dark:text-[#ffcf4d] hover:underline disabled:opacity-50"
+                >
+                  {exportingMatchId === report.matchId ? "Exporting…" : "Download PDF"}
+                </button>
               </div>
 
               {isOpen && (
@@ -610,7 +684,7 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                     ))}
                   </div>
 
-                  <div className="p-5">
+                  <div ref={panelRef} className="p-5">
                     {activeTab === "facts" && (
                       <>
                         {report.events ? (
