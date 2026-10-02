@@ -770,24 +770,15 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                     )}
 
                     {activeTab === "physical" && (
-                      report.psimPhysicalStats ? (
-                        <div className="flex flex-col gap-6">
-                          <PhysicalStatsTable players={report.psimPhysicalStats} />
-                          {report.psimPhysicalHalves && (
-                            <>
-                              <div className="border-t border-gray-200 dark:border-[#2a2b30]" />
-                              <div>
-                                <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">1st Half vs 2nd Half</h4>
-                                <PhysicalStatsHalfCompare
-                                  total={report.psimPhysicalStats ?? []}
-                                  firstHalf={report.psimPhysicalHalves.firstHalf}
-                                  secondHalf={report.psimPhysicalHalves.secondHalf}
-                                  substitutions={((report.homeTeam === PSIM ? report.events?.home : report.events?.away) ?? []).filter((e) => e.type === "substitution")}
-                                />
-                              </div>
-                            </>
-                          )}
-                        </div>
+                      report.psimPhysicalStats && report.psimPhysicalHalves ? (
+                        <PhysicalStatsHalfCompare
+                          total={report.psimPhysicalStats}
+                          firstHalf={report.psimPhysicalHalves.firstHalf}
+                          secondHalf={report.psimPhysicalHalves.secondHalf}
+                          substitutions={((report.homeTeam === PSIM ? report.events?.home : report.events?.away) ?? []).filter((e) => e.type === "substitution")}
+                        />
+                      ) : report.psimPhysicalStats ? (
+                        <PhysicalStatsTable players={report.psimPhysicalStats} />
                       ) : (
                         <p className="text-xs text-gray-500 dark:text-gray-400">No physical stats data available.</p>
                       )
