@@ -57,6 +57,16 @@ export function PhysicalStatsHalfCompare({
   const bySecond = new Map(secondHalf.map((p) => [p.playerId, p]));
   const playerIds = [...new Set([...byTotal.keys(), ...byFirst.keys(), ...bySecond.keys()])];
 
+  // A player who was subbed partway through a half (or didn't feature in it
+  // at all) naturally posts a lower number there — flagging that so a
+  // shorter bar doesn't read as "dropped off" when they just played less.
+  // Catapult's own per-half minutesPlayed is the giveaway: a full XI of
+  // starters sets the half's true length, and anyone well short of that
+  // either came on late or went off early.
+  const firstHalfLength = Math.max(0, ...firstHalf.map((p) => p.minutesPlayed ?? 0));
+  const secondHalfLength = Math.max(0, ...secondHalf.map((p) => p.minutesPlayed ?? 0));
+  const isPartial = (minutes: number | null | undefined, halfLength: number) => halfLength > 0 && (minutes === null || minutes === undefined || minutes < halfLength * 0.85);
+
   const rows = playerIds
     .map((id) => {
       const t = byTotal.get(id) ?? null;
@@ -77,6 +87,10 @@ export function PhysicalStatsHalfCompare({
         delta,
         good,
         bad,
+        aPartial: isPartial(a?.minutesPlayed, firstHalfLength),
+        bPartial: isPartial(b?.minutesPlayed, secondHalfLength),
+        aMinutes: a?.minutesPlayed ?? null,
+        bMinutes: b?.minutesPlayed ?? null,
       };
     })
     .filter((r) => r.aVal !== null || r.bVal !== null)
@@ -168,13 +182,27 @@ export function PhysicalStatsHalfCompare({
                     {r.delta.toFixed(decimals)}
                   </span>
                 )}
+                {(r.aPartial || r.bPartial) && (
+                  <span
+                    className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full px-1.5 py-0.5"
+                    title={`Didn't play a full half — 1st: ${r.aMinutes !== null ? `${r.aMinutes.toFixed(0)}m` : "off"}, 2nd: ${r.bMinutes !== null ? `${r.bMinutes.toFixed(0)}m` : "off"}`}
+                  >
+                    ⇄ Sub
+                  </span>
+                )}
               </div>
               <div className="flex flex-col gap-1">
-                <div className="h-2 rounded-full bg-gray-100 dark:bg-[#2a2b30] overflow-hidden">
-                  <div className="h-full rounded-full bg-blue-500" style={{ width: `${((r.aVal ?? 0) / max) * 100}%` }} />
+                <div className="flex items-center gap-1.5">
+                  <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-[#2a2b30] overflow-hidden">
+                    <div className={`h-full rounded-full bg-blue-500 ${r.aPartial ? "opacity-50" : ""}`} style={{ width: `${((r.aVal ?? 0) / max) * 100}%` }} />
+                  </div>
+                  {r.aPartial && <span className="text-[9px] text-amber-600 dark:text-amber-400 shrink-0">{r.aMinutes !== null ? `${r.aMinutes.toFixed(0)}m` : "off"}</span>}
                 </div>
-                <div className="h-2 rounded-full bg-gray-100 dark:bg-[#2a2b30] overflow-hidden">
-                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${((r.bVal ?? 0) / max) * 100}%` }} />
+                <div className="flex items-center gap-1.5">
+                  <div className="flex-1 h-2 rounded-full bg-gray-100 dark:bg-[#2a2b30] overflow-hidden">
+                    <div className={`h-full rounded-full bg-emerald-500 ${r.bPartial ? "opacity-50" : ""}`} style={{ width: `${((r.bVal ?? 0) / max) * 100}%` }} />
+                  </div>
+                  {r.bPartial && <span className="text-[9px] text-amber-600 dark:text-amber-400 shrink-0">{r.bMinutes !== null ? `${r.bMinutes.toFixed(0)}m` : "off"}</span>}
                 </div>
               </div>
             </div>
