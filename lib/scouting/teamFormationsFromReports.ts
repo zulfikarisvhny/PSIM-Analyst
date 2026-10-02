@@ -6,18 +6,29 @@
 // the same match-report tables (match_formation_lineups, match_events).
 import { createPsimServerClient } from "../supabase/psimServerClient";
 
+export type PlayerTag = "foreign" | "u23" | null;
+
 export interface FormationSlotEntry {
   playerId: number | null;
   playerName: string;
   jersey: number;
   xPct: number; // 0-100, touchline to touchline
   yPct: number; // 0-100, own goal = 0, opponent goal = 100
+  /** "foreign" (non-Indonesian passport/birth country) takes precedence over "u23" (age < 23) — matches how match-report PDFs color-code their own lineup pages. null when age/nationality aren't known. */
+  tag: PlayerTag;
 }
 
 export interface SubstitutionEntry {
   minute: number;
   playerOutName: string | null;
   playerInName: string | null;
+}
+
+export interface BenchPlayerEntry {
+  playerId: number | null;
+  playerName: string;
+  jersey: number;
+  tag: PlayerTag;
 }
 
 export interface TeamFormationMatch {
@@ -29,6 +40,8 @@ export interface TeamFormationMatch {
   starting: FormationSlotEntry[];
   final: FormationSlotEntry[];
   substitutions: SubstitutionEntry[];
+  /** Every bench player (whether or not they came on) — the full "Substitutes" roster from the lineup page. */
+  bench: BenchPlayerEntry[];
 }
 
 interface RawClub {
@@ -60,6 +73,21 @@ interface RawEventRow {
   player_name_raw: string | null;
   sub_in_player_name_raw: string | null;
   minute: number;
+}
+
+interface RawSeasonStatsRow {
+  player_id: number;
+  age: number | null;
+  stats: { passport_country?: string | null; birth_country?: string | null } | null;
+}
+
+interface RawLineupRow {
+  match_id: number;
+  club_id: number;
+  player_id: number | null;
+  player_name_raw: string;
+  jersey_number: number;
+  is_starter: boolean;
 }
 
 /**
@@ -99,7 +127,7 @@ export async function fetchTeamFormations(teamFullName: string): Promise<TeamFor
   if (matchRows.length === 0) return [];
   const matchIds = matchRows.map((m) => m.id);
 
-  const [{ data: lineupRows }, { data: eventRows }] = await Promise.all([
+  const [{ data: lineupRows }, { data: eventRows }, { data: seasonStatsRows }, { data: benchRows }] = await Promise.all([
     supabase
       .from("match_formation_lineups")
       .select("match_id, club_id, player_id, player_name_raw, jersey_number, phase, x_pct, y_pct")
@@ -111,18 +139,55 @@ export async function fetchTeamFormations(teamFullName: string): Promise<TeamFor
       .eq("club_id", clubId)
       .eq("event_type", "substitution")
       .in("match_id", matchIds),
+    supabase.from("player_season_stats").select("player_id, age, stats").eq("club_id", clubId),
+    supabase
+      .from("match_lineups")
+      .select("match_id, club_id, player_id, player_name_raw, jersey_number, is_starter")
+      .eq("club_id", clubId)
+      .eq("is_starter", false)
+      .in("match_id", matchIds),
   ]);
 
   const lineups = (lineupRows ?? []) as RawFormationRow[];
   const subs = (eventRows ?? []) as RawEventRow[];
+  const bench = (benchRows ?? []) as RawLineupRow[];
   const matchIdsWithLineups = [...new Set(lineups.map((r) => r.match_id))];
+
+  // Mirrors leagueLeaders.ts's isLocal logic: passport_country wins, falling
+  // back to birth_country — "foreign" only when we positively know it's not
+  // Indonesia, never from a missing/unknown value.
+  const tagByPlayerId = new Map<number, PlayerTag>();
+  for (const r of (seasonStatsRows ?? []) as RawSeasonStatsRow[]) {
+    const s = r.stats ?? {};
+    const isLocal = s.passport_country ? s.passport_country.includes("Indonesia") : s.birth_country ? s.birth_country.includes("Indonesia") : null;
+    const tag: PlayerTag = isLocal === false ? "foreign" : r.age !== null && r.age < 23 ? "u23" : null;
+    tagByPlayerId.set(r.player_id, tag);
+  }
+
+  // After mirroring (see below), markers still read a little further right
+  // than they should — likely the same jersey-text-left-edge-vs-center
+  // issue noted before. Small nudge left to compensate.
+  const X_CALIBRATION_OFFSET = 3;
 
   const toSlot = (r: RawFormationRow): FormationSlotEntry => ({
     playerId: r.player_id,
     playerName: r.player_name_raw,
     jersey: r.jersey_number,
-    xPct: r.x_pct,
+    // The source table's x_pct reads mirrored for this diagram (right-backs
+    // land on the left, left-wingers on the right, etc.) — confirmed against
+    // a real lineup (RB/LB and both wings swapped). Flipping it here is
+    // cheaper than re-deriving the box-detection math in the PDF parser and
+    // fixes every match already imported, not just future ones.
+    xPct: Math.max(0, Math.min(100, 100 - r.x_pct - X_CALIBRATION_OFFSET)),
     yPct: r.y_pct,
+    tag: r.player_id ? tagByPlayerId.get(r.player_id) ?? null : null,
+  });
+
+  const toBenchEntry = (r: RawLineupRow): BenchPlayerEntry => ({
+    playerId: r.player_id,
+    playerName: r.player_name_raw,
+    jersey: r.jersey_number,
+    tag: r.player_id ? tagByPlayerId.get(r.player_id) ?? null : null,
   });
 
   return matchIdsWithLineups
@@ -149,6 +214,7 @@ export async function fetchTeamFormations(teamFullName: string): Promise<TeamFor
         starting: matchLineups.filter((r) => r.phase === "starting").map(toSlot),
         final: matchLineups.filter((r) => r.phase === "final").map(toSlot),
         substitutions,
+        bench: bench.filter((r) => r.match_id === matchId).map(toBenchEntry),
       };
     })
     .sort((a, b) => (b.matchDate ?? "").localeCompare(a.matchDate ?? ""));

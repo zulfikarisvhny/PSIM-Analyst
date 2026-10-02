@@ -8,7 +8,7 @@ import { loadPdfjs, getPageItems, groupRows, type TextItem } from "../pdf/textLa
 import { parseTimeSegments, type TimeSegmentsResult } from "./parseTimeSegments";
 import { extractPatternFills } from "./resolveChartColors";
 import { extractIconFills, classifyMarkerIcon, type IconFill } from "./resolveIconColors";
-import { parseMatchEvents, parseStartingLineups, type MatchEvent, type StartingPlayer } from "./parseMatchEvents";
+import { parseMatchEvents, parseStartingLineups, parseBenchPlayers, type MatchEvent, type StartingPlayer } from "./parseMatchEvents";
 import { parseAveragePositions, type AveragePosition } from "./parseAveragePositions";
 import { parsePassCombinationPage, type TeamPassSummary } from "./parsePassCombinations";
 import { parseShots, type ShotEvent } from "./parseShots";
@@ -42,6 +42,8 @@ export interface ExtractedMatchReport {
   matchEvents: { home: MatchEvent[]; away: MatchEvent[] };
   // The 11 starting players per side (jersey, formation slot, name) — for the pitch/formation view.
   startingLineups: { home: StartingPlayer[]; away: StartingPlayer[] };
+  // Every bench player per side (jersey, position code, name) — the full "Substitutes" section roster, whether or not they came on.
+  benchPlayers: { home: StartingPlayer[]; away: StartingPlayer[] };
   // Every player's average on-pitch position (jersey + x/y %), from the POSITIONS page's own diagram — includes subs, not just the starting 11.
   averagePositions: { home: AveragePosition[]; away: AveragePosition[] };
   shots: { home: ShotEvent[]; away: ShotEvent[] };
@@ -331,6 +333,7 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
   let secondHalfAdded = 0;
   let lineupEvents: { home: MatchEvent[]; away: MatchEvent[] } = { home: [], away: [] };
   let startingLineups: { home: StartingPlayer[]; away: StartingPlayer[] } = { home: [], away: [] };
+  let benchPlayers: { home: StartingPlayer[]; away: StartingPlayer[] } = { home: [], away: [] };
   if (lineupPageNum > 0) {
     const lineupPage = await doc.getPage(lineupPageNum);
     const items = await getPageItems(lineupPage);
@@ -343,6 +346,7 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
     const lineupFills = await extractIconFills(pdfjsLib, lineupPage);
     lineupEvents = parseMatchEvents(items, lineupWidth, lineupFills);
     startingLineups = parseStartingLineups(items, lineupWidth);
+    benchPlayers = parseBenchPlayers(items, lineupWidth);
   }
 
   const positionsPageNum = findPositionsPageIndex(pagesText) + 1;
@@ -462,6 +466,7 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
     passCombinationsAway,
     matchEvents,
     startingLineups,
+    benchPlayers,
     averagePositions,
     shots,
     losses,

@@ -77,6 +77,50 @@ export function parseStartingLineups(items: TextItem[], pageWidth: number): { ho
   };
 }
 
+const JERSEY_ONLY_RE = /^\d{1,3}$/;
+
+/**
+ * The "Bench" section (printed below "Substitutes") lists truly-unused
+ * reserves as just a jersey number + name — no position code, unlike every
+ * other lineup row. parseLineupRows requires a position code as the row's
+ * first item, so it silently drops this section entirely; this is the same
+ * row/side-splitting idea but for the position-less format.
+ */
+function parseBenchOnlyRows(items: TextItem[], pageWidth: number, yMin: number, yMax: number): LineupRow[] {
+  const mid = pageWidth / 2;
+  const rows = groupRows(items.filter((it) => it.y > yMin && it.y < yMax));
+  const out: LineupRow[] = [];
+
+  for (const row of rows) {
+    for (const side of ["home", "away"] as const) {
+      const half = row.filter((it) => (side === "home" ? it.x < mid : it.x >= mid));
+      if (half.length === 0) continue;
+      const jerseyItem = half.find((it) => JERSEY_ONLY_RE.test(it.str));
+      if (!jerseyItem) continue;
+      const nameItem = half.find((it) => it !== jerseyItem);
+      if (!nameItem) continue;
+      out.push({ position: "", side, jersey: Number(jerseyItem.str), name: nameItem.str, markers: [] });
+    }
+  }
+  return out;
+}
+
+/** Every bench player per side (jersey, position code, name) — both the "Substitutes" (used, with position code) and "Bench" (unused, no position code) rows, whether or not they actually came on. */
+export function parseBenchPlayers(items: TextItem[], pageWidth: number): { home: StartingPlayer[]; away: StartingPlayer[] } {
+  const subsY = findHeaderY(items, "Substitutes");
+  const benchY = findHeaderY(items, "Bench");
+  if (subsY === null || benchY === null) return { home: [], away: [] };
+
+  const usedSubs = parseLineupRows(items, pageWidth, benchY, subsY);
+  const unusedBench = parseBenchOnlyRows(items, pageWidth, 0, benchY);
+  const rows = [...usedSubs, ...unusedBench];
+
+  return {
+    home: rows.filter((r) => r.side === "home").map((r) => ({ jersey: r.jersey, position: r.position, name: r.name })),
+    away: rows.filter((r) => r.side === "away").map((r) => ({ jersey: r.jersey, position: r.position, name: r.name })),
+  };
+}
+
 export function parseMatchEvents(items: TextItem[], pageWidth: number, fills: IconFill[]): { home: MatchEvent[]; away: MatchEvent[] } {
   const startY = findHeaderY(items, "Starting lineup");
   const subsY = findHeaderY(items, "Substitutes");

@@ -1,19 +1,65 @@
 // components/scouting/TeamFormationHistory.tsx
 "use client";
 import { useState } from "react";
-import type { FormationSlotEntry, TeamFormationMatch } from "@/lib/scouting/teamFormationsFromReports";
+import type { FormationSlotEntry, PlayerTag, TeamFormationMatch } from "@/lib/scouting/teamFormationsFromReports";
+
+// Matches how match-report PDFs color-code their own lineup pages: foreign
+// players in blue, U23 (home-grown/young) players in orange, everyone else
+// in near-black. Same convention for both the pitch labels and the list.
+const TAG_COLOR: Record<"foreign" | "u23", string> = {
+  foreign: "#2563eb",
+  u23: "#e08a1e",
+};
+
+function nameColor(tag: PlayerTag): string {
+  return tag ? TAG_COLOR[tag] : "#1f2937";
+}
 
 function PlayerDot({ slot }: { slot: FormationSlotEntry }) {
   return (
     <div
-      className="absolute flex flex-col items-center gap-1"
+      className="absolute flex flex-col items-center gap-0.5"
       style={{ left: `${slot.xPct}%`, top: `${100 - slot.yPct}%`, transform: "translate(-50%, -50%)" }}
     >
-      <div className="w-7 h-7 rounded-full bg-white border-2 border-gray-700 dark:border-[#0e0e10] shadow flex items-center justify-center text-[10px] font-bold text-gray-900">
+      <div className="w-6 h-6 rounded-full bg-[#e0392e] border border-white shadow flex items-center justify-center text-[10px] font-bold text-white">
         {slot.jersey}
       </div>
-      <span className="text-[8px] font-medium text-white text-center leading-tight max-w-[70px] truncate drop-shadow">{slot.playerName}</span>
+      <span
+        className="text-[7.5px] font-bold text-center leading-tight max-w-[74px] truncate uppercase"
+        style={{ color: nameColor(slot.tag) }}
+      >
+        {slot.playerName}
+      </span>
     </div>
+  );
+}
+
+function PitchLines() {
+  return (
+    <svg viewBox="0 0 68 105" className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+      {/* outer boundary */}
+      <rect x={0.3} y={0.3} width={67.4} height={104.4} fill="none" stroke="#1f2937" strokeWidth={0.6} />
+      {/* halfway line + center circle/spot */}
+      <line x1={0} y1={52.5} x2={68} y2={52.5} stroke="#1f2937" strokeWidth={0.5} />
+      <circle cx={34} cy={52.5} r={9.15} fill="none" stroke="#1f2937" strokeWidth={0.5} />
+      <circle cx={34} cy={52.5} r={0.5} fill="#1f2937" />
+      {/* top penalty box + D + spot */}
+      <rect x={13.84} y={0} width={40.32} height={16.5} fill="none" stroke="#1f2937" strokeWidth={0.5} />
+      <path d="M 26.69 16.5 A 9.15 9.15 0 0 0 41.31 16.5" fill="none" stroke="#1f2937" strokeWidth={0.5} />
+      <circle cx={34} cy={11} r={0.375} fill="#1f2937" />
+      {/* bottom penalty box + D + spot */}
+      <rect x={13.84} y={88.5} width={40.32} height={16.5} fill="none" stroke="#1f2937" strokeWidth={0.5} />
+      <path d="M 26.69 88.5 A 9.15 9.15 0 0 1 41.31 88.5" fill="none" stroke="#1f2937" strokeWidth={0.5} />
+      <circle cx={34} cy={94} r={0.375} fill="#1f2937" />
+      {/* goal ticks */}
+      <rect x={29.32} y={-1.3} width={9.36} height={1.3} fill="#1f2937" />
+      <rect x={29.32} y={105} width={9.36} height={1.3} fill="#1f2937" />
+      {/* corner arcs */}
+      <path d="M 1.3 0 A 1.3 1.3 0 0 1 0 1.3" fill="none" stroke="#1f2937" strokeWidth={0.4} />
+      <path d="M 68 1.3 A 1.3 1.3 0 0 1 66.7 0" fill="none" stroke="#1f2937" strokeWidth={0.4} />
+      <path d="M 66.7 105 A 1.3 1.3 0 0 1 68 103.7" fill="none" stroke="#1f2937" strokeWidth={0.4} />
+      <path d="M 0 103.7 A 1.3 1.3 0 0 1 1.3 105" fill="none" stroke="#1f2937" strokeWidth={0.4} />
+    </svg>
   );
 }
 
@@ -21,15 +67,10 @@ function Pitch({ label, slots }: { label: string; slots: FormationSlotEntry[] })
   return (
     <div>
       <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase text-center mb-1.5">{label}</p>
-      <div
-        className="relative w-full mx-auto rounded-md overflow-hidden"
-        style={{ aspectRatio: "68 / 105", background: "repeating-linear-gradient(180deg, #2f8f4e 0%, #2f8f4e 10%, #34954f 10%, #34954f 20%)" }}
-      >
-        <div className="absolute inset-2 border border-white/40 rounded-sm" />
-        <div className="absolute left-2 right-2 top-1/2 h-px bg-white/40" />
-        <div className="absolute top-1/2 left-1/2 w-14 h-14 rounded-full border border-white/40" style={{ transform: "translate(-50%, -50%)" }} />
+      <div className="relative w-full mx-auto rounded-md overflow-hidden bg-white border border-gray-200" style={{ aspectRatio: "68 / 105" }}>
+        <PitchLines />
         {slots.length === 0 ? (
-          <p className="absolute inset-0 flex items-center justify-center text-[11px] text-white/70 px-4 text-center">No lineup data.</p>
+          <p className="absolute inset-0 flex items-center justify-center text-[11px] text-gray-400 px-4 text-center">No lineup data.</p>
         ) : (
           slots.map((s, i) => <PlayerDot key={s.playerId ?? `${label}-${i}`} slot={s} />)
         )}
@@ -52,11 +93,13 @@ function MatchPanel({ match }: { match: TeamFormationMatch }) {
           {startingSorted.length === 0 ? (
             <p className="text-xs text-gray-500 dark:text-gray-400">No lineup data.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+            <div className="flex flex-col gap-1">
               {startingSorted.map((s, i) => (
                 <div key={s.playerId ?? i} className="flex items-center gap-2 text-xs">
-                  <span className="w-5 shrink-0 text-right font-mono font-bold text-gray-400">{s.jersey}</span>
-                  <span className="truncate text-gray-900 dark:text-white">{s.playerName}</span>
+                  <span className="w-6 shrink-0 text-right font-mono font-bold text-gray-400">[{s.jersey}]</span>
+                  <span className="truncate font-semibold uppercase" style={{ color: nameColor(s.tag) }}>
+                    {s.playerName}
+                  </span>
                 </div>
               ))}
             </div>
@@ -64,21 +107,34 @@ function MatchPanel({ match }: { match: TeamFormationMatch }) {
         </div>
 
         <div>
-          <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">Substitutes used</p>
-          {match.substitutions.length === 0 ? (
-            <p className="text-xs text-gray-500 dark:text-gray-400">No substitutions recorded for this match.</p>
+          <p className="text-[11px] font-bold tracking-wider text-gray-400 uppercase mb-2">Substitutes</p>
+          {match.bench.length === 0 ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">No bench data for this match.</p>
           ) : (
-            <div className="flex flex-col gap-1.5">
-              {match.substitutions.map((sub, i) => (
-                <div key={i} className="flex items-center gap-2 text-xs">
-                  <span className="w-8 shrink-0 text-right font-mono font-bold text-blue-600 dark:text-[#ffcf4d]">{sub.minute}&apos;</span>
-                  <span className="text-gray-400 truncate">{sub.playerOutName ?? "?"}</span>
-                  <span className="text-gray-300 dark:text-gray-600">→</span>
-                  <span className="text-gray-900 dark:text-white font-semibold truncate">{sub.playerInName ?? "?"}</span>
-                </div>
-              ))}
+            <div className="flex flex-col gap-1">
+              {match.bench.map((s, i) => {
+                const subIn = match.substitutions.find((sub) => sub.playerInName === s.playerName);
+                return (
+                  <div key={s.playerId ?? i} className="flex items-center gap-2 text-xs">
+                    <span className="w-6 shrink-0 text-right font-mono font-bold text-gray-400">[{s.jersey}]</span>
+                    <span className="truncate font-semibold uppercase" style={{ color: nameColor(s.tag) }}>
+                      {s.playerName}
+                    </span>
+                    {subIn && <span className="shrink-0 text-[10px] font-bold text-green-600">↑{subIn.minute}&apos;</span>}
+                  </div>
+                );
+              })}
             </div>
           )}
+        </div>
+
+        <div className="flex items-center gap-4 text-[10px] text-gray-500 dark:text-gray-400 pt-1 border-t border-gray-100 dark:border-[#2a2b30]">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ background: TAG_COLOR.foreign }} /> Foreign
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full" style={{ background: TAG_COLOR.u23 }} /> U23
+          </span>
         </div>
       </div>
 

@@ -68,6 +68,7 @@ export async function POST(request: Request) {
           passCombinationsAway: report.passCombinationsAway,
           matchEvents: report.matchEvents,
           startingLineups: report.startingLineups,
+          benchPlayers: report.benchPlayers,
           averagePositions: report.averagePositions,
           shots: report.shots,
           losses: report.losses,

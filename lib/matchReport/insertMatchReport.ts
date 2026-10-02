@@ -168,32 +168,38 @@ async function insertMatchEvents(
   return rows.length;
 }
 
-/** Resolves each starting player's name against that side's roster and inserts one row per player, for the pitch/formation view. */
+/** Resolves each starting + bench player's name against that side's roster and inserts one row per player (is_starter distinguishes the two), for the pitch/formation view and the bench list. */
 async function insertStartingLineups(
   supabase: SupabaseClient,
   matchId: string,
-  sides: { clubId: string; players: StartingPlayer[] }[]
+  sides: { clubId: string; starting: StartingPlayer[]; bench: StartingPlayer[] }[]
 ): Promise<number> {
   const { error: delErr } = await supabase.from("match_lineups").delete().eq("match_id", matchId);
   if (delErr) throw new Error(`match_lineups delete failed: ${delErr.message}`);
 
   const rows: Record<string, unknown>[] = [];
-  for (const { clubId, players } of sides) {
-    if (players.length === 0) continue;
+  for (const { clubId, starting, bench } of sides) {
+    if (starting.length === 0 && bench.length === 0) continue;
     const { data: roster, error: rosterErr } = await supabase.from("players").select("id, name").eq("club_id", clubId);
     if (rosterErr) throw new Error(`players lookup failed for club ${clubId}: ${rosterErr.message}`);
     const rosterOptions: PlayerOption[] = (roster ?? []).map((p: { id: string; name: string }) => ({ id: Number(p.id), name: p.name }));
 
-    for (const player of players) {
-      const match = matchPlayerName(player.name, rosterOptions);
-      rows.push({
-        match_id: matchId,
-        club_id: clubId,
-        player_id: match.playerId !== null ? String(match.playerId) : null,
-        player_name_raw: player.name,
-        jersey_number: player.jersey,
-        position_code: player.position,
-      });
+    for (const [players, isStarter] of [
+      [starting, true],
+      [bench, false],
+    ] as const) {
+      for (const player of players) {
+        const match = matchPlayerName(player.name, rosterOptions);
+        rows.push({
+          match_id: matchId,
+          club_id: clubId,
+          player_id: match.playerId !== null ? String(match.playerId) : null,
+          player_name_raw: player.name,
+          jersey_number: player.jersey,
+          position_code: player.position,
+          is_starter: isStarter,
+        });
+      }
     }
   }
 
@@ -446,8 +452,8 @@ export async function insertMatchReport(data: ExtractedMatchReport, supabase: Su
   ]);
 
   const lineupsInserted = await insertStartingLineups(supabase, matchId, [
-    { clubId: homeId, players: data.startingLineups?.home ?? [] },
-    { clubId: awayId, players: data.startingLineups?.away ?? [] },
+    { clubId: homeId, starting: data.startingLineups?.home ?? [], bench: data.benchPlayers?.home ?? [] },
+    { clubId: awayId, starting: data.startingLineups?.away ?? [], bench: data.benchPlayers?.away ?? [] },
   ]);
 
   const jerseyToName = (players: TeamPassSummary | null) => new Map((players?.players ?? []).map((p) => [p.jersey, p.name]));
