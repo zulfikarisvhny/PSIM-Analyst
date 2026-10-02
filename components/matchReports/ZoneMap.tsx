@@ -161,7 +161,7 @@ export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "re
       <div className="max-w-2xl mx-auto mt-3">
         <div className="flex items-center justify-between mb-1.5">
           <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
-            {selected ? `Top 5 — Zone ${selected.col * ROWS + selected.row + 1}` : "Top 5 players"}
+            {selected ? `Top ${topPlayers.length} — Zone ${selected.col * ROWS + selected.row + 1}` : `Top ${topPlayers.length} players`}
           </p>
           {selected && (
             <button
