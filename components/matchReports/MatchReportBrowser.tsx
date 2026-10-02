@@ -80,7 +80,9 @@ interface MatchEventEntry {
   type: "goal" | "yellow_card" | "red_card" | "substitution";
   minute: string;
   player: string;
+  playerId: number | null;
   subInPlayer: string | null;
+  subInPlayerId: number | null;
 }
 
 interface LineupPlayerEntry {
@@ -780,6 +782,7 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                                   total={report.psimPhysicalStats ?? []}
                                   firstHalf={report.psimPhysicalHalves.firstHalf}
                                   secondHalf={report.psimPhysicalHalves.secondHalf}
+                                  substitutions={((report.homeTeam === PSIM ? report.events?.home : report.events?.away) ?? []).filter((e) => e.type === "substitution")}
                                 />
                               </div>
                             </>

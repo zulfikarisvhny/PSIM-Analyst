@@ -81,7 +81,9 @@ export interface MatchEventEntry {
   type: "goal" | "yellow_card" | "red_card" | "substitution";
   minute: string;
   player: string; // scorer / carded player / player going off
+  playerId: number | null;
   subInPlayer: string | null; // substitution only
+  subInPlayerId: number | null;
 }
 
 export interface LineupPlayerEntry {
@@ -409,7 +411,9 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
       type: r.event_type,
       minute: r.minute,
       player: r.player_id ? playerById.get(r.player_id)?.name ?? r.player_name_raw : r.player_name_raw,
+      playerId: r.player_id,
       subInPlayer: r.sub_in_player_id ? playerById.get(r.sub_in_player_id)?.name ?? r.sub_in_player_name_raw : r.sub_in_player_name_raw,
+      subInPlayerId: r.sub_in_player_id,
     });
     eventsByKey.set(key, list);
   }

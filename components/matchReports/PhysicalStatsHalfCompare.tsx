@@ -19,6 +19,15 @@ interface PlayerPhysicalStat {
   minutesPlayed: number | null;
 }
 
+interface SubstitutionEvent {
+  type: "goal" | "yellow_card" | "red_card" | "substitution";
+  minute: string;
+  player: string;
+  playerId: number | null;
+  subInPlayer: string | null;
+  subInPlayerId: number | null;
+}
+
 type MetricKey = "totalDistanceM" | "highSpeedRunningM" | "sprintDistanceM" | "topSpeedKmh" | "accelerations" | "decelerations" | "minutesPlayed";
 
 const METRICS: { key: MetricKey; label: string; decimals?: number; higherIsBetter?: boolean }[] = [
@@ -41,16 +50,28 @@ export function PhysicalStatsHalfCompare({
   total,
   firstHalf,
   secondHalf,
+  substitutions = [],
 }: {
   total: PlayerPhysicalStat[];
   firstHalf: PlayerPhysicalStat[];
   secondHalf: PlayerPhysicalStat[];
+  substitutions?: SubstitutionEvent[];
 }) {
   const [metricKey, setMetricKey] = useState<MetricKey>("totalDistanceM");
   const [trend, setTrend] = useState<Trend>("all");
   const metric = METRICS.find((m) => m.key === metricKey)!;
   const decimals = metric.decimals ?? 0;
   const higherIsBetter = metric.higherIsBetter ?? true;
+
+  // Keyed by playerId so a flagged half can say exactly who they were
+  // swapped with, not just "subbed" — one side per sub (the player who went
+  // off knows who replaced them; the one who came on knows who they
+  // replaced).
+  const subByPlayerId = new Map<number, { minute: string; label: string }>();
+  for (const e of substitutions) {
+    if (e.playerId !== null) subByPlayerId.set(e.playerId, { minute: e.minute, label: e.subInPlayer ? `Replaced by ${e.subInPlayer}` : "Subbed off" });
+    if (e.subInPlayerId !== null) subByPlayerId.set(e.subInPlayerId, { minute: e.minute, label: `On for ${e.player}` });
+  }
 
   const byTotal = new Map(total.map((p) => [p.playerId, p]));
   const byFirst = new Map(firstHalf.map((p) => [p.playerId, p]));
@@ -91,6 +112,7 @@ export function PhysicalStatsHalfCompare({
         bPartial: isPartial(b?.minutesPlayed, secondHalfLength),
         aMinutes: a?.minutesPlayed ?? null,
         bMinutes: b?.minutesPlayed ?? null,
+        sub: subByPlayerId.get(id) ?? null,
       };
     })
     .filter((r) => r.aVal !== null || r.bVal !== null)
@@ -184,10 +206,14 @@ export function PhysicalStatsHalfCompare({
                 )}
                 {(r.aPartial || r.bPartial) && (
                   <span
-                    className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full px-1.5 py-0.5"
-                    title={`Didn't play a full half — 1st: ${r.aMinutes !== null ? `${r.aMinutes.toFixed(0)}m` : "off"}, 2nd: ${r.bMinutes !== null ? `${r.bMinutes.toFixed(0)}m` : "off"}`}
+                    className="text-[10px] font-bold text-amber-700 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/30 rounded-full px-1.5 py-0.5 truncate max-w-[220px]"
+                    title={
+                      r.sub
+                        ? `${r.sub.label} (${r.sub.minute}') — 1st: ${r.aMinutes !== null ? `${r.aMinutes.toFixed(0)}m` : "off"}, 2nd: ${r.bMinutes !== null ? `${r.bMinutes.toFixed(0)}m` : "off"}`
+                        : `Didn't play a full half — 1st: ${r.aMinutes !== null ? `${r.aMinutes.toFixed(0)}m` : "off"}, 2nd: ${r.bMinutes !== null ? `${r.bMinutes.toFixed(0)}m` : "off"}`
+                    }
                   >
-                    ⇄ Sub
+                    ⇄ {r.sub ? `${r.sub.label} (${r.sub.minute}')` : "Sub"}
                   </span>
                 )}
               </div>
