@@ -20,16 +20,43 @@ const CHART_HEIGHT = 220;
 const AXIS_PAD_BOTTOM = 28;
 const AXIS_PAD_TOP = 10;
 
+const selectClass = "bg-white border border-gray-200 rounded-md px-2 py-1.5 text-xs font-semibold text-gray-700";
+const numberClass = "w-16 bg-white border border-gray-200 rounded-md px-2 py-1.5 text-xs text-gray-700";
+
 export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] }) {
   const [categoryKey, setCategoryKey] = useState(STAT_CATEGORIES[0].key);
+  const [position, setPosition] = useState("all");
+  const [minAge, setMinAge] = useState("");
+  const [maxAge, setMaxAge] = useState("");
+  const [minMinutes, setMinMinutes] = useState("50");
+  const [maxMinutes, setMaxMinutes] = useState("");
   const category = STAT_CATEGORIES.find((c) => c.key === categoryKey)!;
 
+  const positions = useMemo(() => {
+    return [...new Set(players.map((p) => p.position).filter((p): p is string => !!p))].sort();
+  }, [players]);
+
+  const filteredPlayers = useMemo(() => {
+    const minA = minAge === "" ? null : Number(minAge);
+    const maxA = maxAge === "" ? null : Number(maxAge);
+    const minM = minMinutes === "" ? null : Number(minMinutes);
+    const maxM = maxMinutes === "" ? null : Number(maxMinutes);
+    return players.filter((p) => {
+      if (position !== "all" && p.position !== position) return false;
+      if (minA !== null && p.age !== null && p.age < minA) return false;
+      if (maxA !== null && p.age !== null && p.age > maxA) return false;
+      if (minM !== null && p.minutesPlayed < minM) return false;
+      if (maxM !== null && p.minutesPlayed > maxM) return false;
+      return true;
+    });
+  }, [players, position, minAge, maxAge, minMinutes, maxMinutes]);
+
   const ranked = useMemo(() => {
-    return players
+    return filteredPlayers
       .map((p) => ({ player: p, value: category.compute(p) }))
       .filter((r): r is { player: LeagueLeaderRawRow; value: number } => r.value !== null && r.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [players, category]);
+  }, [filteredPlayers, category]);
 
   const top10 = ranked.slice(0, 10);
   const top10Ids = new Set(top10.map((r) => r.player.playerId));
@@ -59,32 +86,52 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col gap-3">
-        {GROUPS.map((group) => (
-          <div key={group}>
-            <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-1.5">{group}</p>
-            <div className="flex flex-wrap gap-1.5">
-              {STAT_CATEGORIES.filter((c) => c.group === group).map((c) => (
-                <button
-                  key={c.key}
-                  type="button"
-                  onClick={() => setCategoryKey(c.key)}
-                  className={`text-[11px] font-semibold rounded-full px-2.5 py-1 border ${
-                    categoryKey === c.key
-                      ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-                  }`}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-1">Stat</label>
+          <select value={categoryKey} onChange={(e) => setCategoryKey(e.target.value)} className={selectClass}>
+            {GROUPS.map((group) => (
+              <optgroup key={group} label={group}>
+                {STAT_CATEGORIES.filter((c) => c.group === group).map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-1">Position</label>
+          <select value={position} onChange={(e) => setPosition(e.target.value)} className={selectClass}>
+            <option value="all">All positions</option>
+            {positions.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-1">Age</label>
+          <div className="flex items-center gap-1.5">
+            <input type="number" placeholder="Min" value={minAge} onChange={(e) => setMinAge(e.target.value)} className={numberClass} />
+            <span className="text-gray-300">–</span>
+            <input type="number" placeholder="Max" value={maxAge} onChange={(e) => setMaxAge(e.target.value)} className={numberClass} />
           </div>
-        ))}
+        </div>
+        <div>
+          <label className="block text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-1">Minutes played</label>
+          <div className="flex items-center gap-1.5">
+            <input type="number" placeholder="Min" value={minMinutes} onChange={(e) => setMinMinutes(e.target.value)} className={numberClass} />
+            <span className="text-gray-300">–</span>
+            <input type="number" placeholder="Max" value={maxMinutes} onChange={(e) => setMaxMinutes(e.target.value)} className={numberClass} />
+          </div>
+        </div>
       </div>
 
       {ranked.length === 0 ? (
-        <p className="text-sm text-gray-500">No qualifying players for this stat yet.</p>
+        <p className="text-sm text-gray-500">No qualifying players for this filter.</p>
       ) : (
         <>
           <div>
@@ -141,6 +188,8 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
                     <p className="text-sm font-semibold text-[#121b2d] truncate">{r.player.name}</p>
                     <p className="text-[11px] text-gray-500 truncate">
                       {r.player.team}
+                      {r.player.position ? ` · ${r.player.position}` : ""}
+                      {r.player.age !== null ? ` · ${r.player.age}y` : ""}
                       {i === 0 && top10.length > 1 ? ` · ${(r.value - top10[1].value).toFixed(category.decimals)} clear of ${top10[1].player.name}` : ""}
                     </p>
                   </div>

@@ -8,8 +8,6 @@ import type { LeagueLeaderRawRow } from "./leagueLeadersCategories";
 
 export type { LeagueLeaderRawRow } from "./leagueLeadersCategories";
 
-const MIN_MINUTES = 50;
-
 interface SeasonStatsJson {
   shots?: number | null;
   shots_on_target_pct?: number | null;
@@ -33,6 +31,8 @@ interface SeasonStatsJson {
 interface RawRow {
   player_id: number;
   club_id: number;
+  position: string | null;
+  age: number | null;
   matches_played: number;
   minutes_played: number;
   goals: number;
@@ -46,10 +46,7 @@ export async function fetchLeagueLeaders(): Promise<LeagueLeaderRawRow[]> {
   const supabase = createPsimServerClient();
 
   const [{ data: seasonRows, error }, { data: players }, { data: clubs }] = await Promise.all([
-    supabase
-      .from("player_season_stats")
-      .select("player_id, club_id, matches_played, minutes_played, goals, assists, xg, xa, stats")
-      .gte("minutes_played", MIN_MINUTES),
+    supabase.from("player_season_stats").select("player_id, club_id, position, age, matches_played, minutes_played, goals, assists, xg, xa, stats"),
     supabase.from("players").select("id, name, photo_url"),
     supabase.from("clubs").select("id, name, logo_url"),
   ]);
@@ -68,6 +65,8 @@ export async function fetchLeagueLeaders(): Promise<LeagueLeaderRawRow[]> {
       team: c?.name ?? "Unknown",
       logoUrl: c?.logo_url ?? null,
       photoUrl: p?.photo_url ?? null,
+      position: r.position,
+      age: r.age,
       matchesPlayed: r.matches_played,
       minutesPlayed: r.minutes_played,
       goals: r.goals,

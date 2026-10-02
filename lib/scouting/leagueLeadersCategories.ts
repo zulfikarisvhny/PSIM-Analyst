@@ -9,6 +9,8 @@ export interface LeagueLeaderRawRow {
   team: string;
   logoUrl: string | null;
   photoUrl: string | null;
+  position: string | null;
+  age: number | null;
   matchesPlayed: number;
   minutesPlayed: number;
   goals: number;
