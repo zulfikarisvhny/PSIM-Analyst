@@ -129,8 +129,12 @@ export function PhysicalStatsHalfCompare({
     .filter((r) => r.aVal !== null || r.bVal !== null)
     .sort((x, y) => (y.totalVal ?? y.bVal ?? 0) - (x.totalVal ?? x.bVal ?? 0));
 
-  const upCount = rows.filter((r) => r.good).length;
-  const downCount = rows.filter((r) => r.bad).length;
+  const upRows = rows.filter((r) => r.good);
+  const downRows = rows.filter((r) => r.bad);
+  const upCount = upRows.length;
+  const downCount = downRows.length;
+  const avgUp = upCount > 0 ? upRows.reduce((sum, r) => sum + Math.abs(r.delta ?? 0), 0) / upCount : null;
+  const avgDown = downCount > 0 ? downRows.reduce((sum, r) => sum + Math.abs(r.delta ?? 0), 0) / downCount : null;
   const filtered = rows.filter((r) => (trend === "all" ? true : trend === "up" ? r.good : r.bad));
   const max = Math.max(1, ...rows.map((r) => Math.max(r.aVal ?? 0, r.bVal ?? 0)));
 
@@ -166,24 +170,30 @@ export function PhysicalStatsHalfCompare({
             <span className="w-3 h-2 rounded-sm bg-emerald-500 inline-block" /> 2nd Half
           </span>
         </div>
-        <div className="flex items-center rounded-md border border-gray-200 dark:border-[#2a2b30] overflow-hidden text-[11px] font-semibold">
-          {(
-            [
-              ["all", `All (${rows.length})`],
-              ["up", `Up (${upCount})`],
-              ["down", `Down (${downCount})`],
-            ] as [Trend, string][]
-          ).map(([t, label]) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTrend(t)}
-              className={`px-2.5 py-1 ${
-                trend === t
-                  ? t === "up"
-                    ? "bg-emerald-600 text-white"
-                    : t === "down"
-                      ? "bg-red-500 text-white"
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">Avg Up {avgUp !== null ? `+${avgUp.toFixed(decimals)}` : "—"}</span>
+            <span className="text-gray-300 dark:text-gray-600">·</span>
+            <span className="text-red-500 dark:text-red-400 font-semibold">Avg Down −{avgDown !== null ? avgDown.toFixed(decimals) : "—"}</span>
+          </div>
+          <div className="flex items-center rounded-md border border-gray-200 dark:border-[#2a2b30] overflow-hidden text-[11px] font-semibold">
+            {(
+              [
+                ["all", `All (${rows.length})`],
+                ["up", `Up (${upCount})`],
+                ["down", `Down (${downCount})`],
+              ] as [Trend, string][]
+            ).map(([t, label]) => (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTrend(t)}
+                className={`px-2.5 py-1 ${
+                  trend === t
+                    ? t === "up"
+                      ? "bg-emerald-600 text-white"
+                      : t === "down"
+                        ? "bg-red-500 text-white"
                       : "bg-blue-600 text-white"
                   : "bg-white dark:bg-[#191a1d] text-gray-600 dark:text-gray-300"
               }`}
@@ -191,6 +201,7 @@ export function PhysicalStatsHalfCompare({
               {label}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
