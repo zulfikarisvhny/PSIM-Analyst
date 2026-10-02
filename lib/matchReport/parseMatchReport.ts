@@ -15,6 +15,7 @@ import { parseShots, type ShotEvent } from "./parseShots";
 import { parseEventScatterPage, type ScatterEvent } from "./parseEventScatterPage";
 import { extractPathBoxes, findEventDiagramBoxes } from "./resolvePathBoxes";
 import { parseFormationLineups, type FormationSlot } from "./parseFormationLineups";
+import { parseLossesTypeBreakdown, parseRecoveriesTypeBreakdown } from "./parseEventTypeBreakdown";
 
 export interface MatchReportMeta {
   homeTeam: string | null;
@@ -424,11 +425,23 @@ export async function parseMatchReportPdf(fileBytes: Uint8Array): Promise<Extrac
 
   let losses: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
   const lossesPageNum = findLossesPageIndex(pagesText) + 1;
-  if (lossesPageNum > 0) losses = await parseScatterPage(lossesPageNum, true);
+  if (lossesPageNum > 0) {
+    losses = await parseScatterPage(lossesPageNum, true);
+    const lossesItems = await getPageItems(await doc.getPage(lossesPageNum));
+    const lossesType = parseLossesTypeBreakdown(lossesItems, meta.homeTeam, meta.awayTeam);
+    Object.assign(teamStatsHome, lossesType.home);
+    Object.assign(teamStatsAway, lossesType.away);
+  }
 
   let recoveries: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
   const recoveriesPageNum = findRecoveriesPageIndex(pagesText) + 1;
-  if (recoveriesPageNum > 0) recoveries = await parseScatterPage(recoveriesPageNum, false);
+  if (recoveriesPageNum > 0) {
+    recoveries = await parseScatterPage(recoveriesPageNum, false);
+    const recoveriesItems = await getPageItems(await doc.getPage(recoveriesPageNum));
+    const recoveriesType = parseRecoveriesTypeBreakdown(recoveriesItems, meta.homeTeam, meta.awayTeam);
+    Object.assign(teamStatsHome, recoveriesType.home);
+    Object.assign(teamStatsAway, recoveriesType.away);
+  }
 
   let keyPasses: { home: ScatterEvent[]; away: ScatterEvent[] } = { home: [], away: [] };
   const keyPassesPageNum = findKeyPassesPageIndex(pagesText) + 1;

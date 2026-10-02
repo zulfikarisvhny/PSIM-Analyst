@@ -282,6 +282,19 @@ const SUMMARY_KEYS = ["shots_on_target", "corners", "yellow_red_cards", "fouls_s
 // instead of a 55-row wall.
 const ATTACK_TYPES_KEYS = ["total_with_shots", "positional_attacks_with_shots", "counterattacks", "corners", "free_kicks", "corners_with_shots", "free_kicks_with_shots"];
 
+const LOSS_TYPE_KEYS = [
+  { key: "losses_type_forward_pass", label: "Forward pass" },
+  { key: "losses_type_lateral_or_back_pass", label: "Lateral/back pass" },
+  { key: "losses_type_ground_duel", label: "Ground duel" },
+  { key: "losses_type_other", label: "Other" },
+];
+const RECOVERY_TYPE_KEYS = [
+  { key: "recoveries_type_positioning", label: "Positioning" },
+  { key: "recoveries_type_interception", label: "Interception" },
+  { key: "recoveries_type_aerial_duel", label: "Aerial duel" },
+  { key: "recoveries_type_ground_duel", label: "Ground duel" },
+];
+
 function parseLeadingNumber(v: string | undefined): number | null {
   if (!v) return null;
   const m = v.match(/^-?\d+(\.\d+)?/);
@@ -701,6 +714,14 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                                   homeEvents={report.eventLocations.home.filter((e) => e.kind === "loss")}
                                   awayEvents={report.eventLocations.away.filter((e) => e.kind === "loss")}
                                 />
+                                {(report.home?.stats["losses_type_forward_pass"] || report.away?.stats["losses_type_forward_pass"]) && (
+                                  <div className="mt-4 max-w-2xl mx-auto">
+                                    <h5 className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1">Losses type</h5>
+                                    {LOSS_TYPE_KEYS.map(({ key, label }) => (
+                                      <ComparisonRow key={key} label={label} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <div>
                                 <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">Recoveries by zone</h4>
@@ -711,6 +732,14 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                                   homeEvents={report.eventLocations.home.filter((e) => e.kind === "recovery")}
                                   awayEvents={report.eventLocations.away.filter((e) => e.kind === "recovery")}
                                 />
+                                {(report.home?.stats["recoveries_type_positioning"] || report.away?.stats["recoveries_type_positioning"]) && (
+                                  <div className="mt-4 max-w-2xl mx-auto">
+                                    <h5 className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1">Recoveries type</h5>
+                                    {RECOVERY_TYPE_KEYS.map(({ key, label }) => (
+                                      <ComparisonRow key={key} label={label} homeRaw={report.home?.stats[key]} awayRaw={report.away?.stats[key]} />
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </>
