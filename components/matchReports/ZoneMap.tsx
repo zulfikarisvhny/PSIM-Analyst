@@ -161,7 +161,7 @@ export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "re
                 {i + 1}
               </span>
               <span className="text-gray-700 dark:text-gray-200 truncate flex-1">{name}</span>
-              <span className="font-semibold text-gray-900 dark:text-white shrink-0">
+              <span className="text-gray-900 dark:text-white shrink-0">
                 {fmt(count)} {kind === "loss" ? "losses" : "recoveries"}
               </span>
             </div>
