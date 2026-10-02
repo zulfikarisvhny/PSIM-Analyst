@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { STAT_CATEGORIES, type LeagueLeaderRawRow, type StatGroup } from "@/lib/scouting/leagueLeadersCategories";
 
-const GROUPS: StatGroup[] = ["Attacking", "Passing", "Defending", "Discipline"];
+const GROUPS: StatGroup[] = ["Attacking", "Passing & Creativity", "Defending", "Dribbling & Duels", "Discipline"];
 
 function fmt(v: number, decimals: number, suffix?: string): string {
   return `${v.toFixed(decimals)}${suffix ?? ""}`;

@@ -1,144 +1,96 @@
 // lib/scouting/leagueLeaders.ts
-// Server-only. League Leaders is built entirely from real, parsed match
-// reports (match_event_locations, match_events, match_passing_summary in the
-// PSIM project) — not mv_players_complete ("Nexus"), which is a separate
-// pre-aggregated dataset unrelated to anything actually uploaded here. That
-// means coverage is only as wide as the matches imported so far (currently
-// a handful), not the full league — it grows as more reports are uploaded.
-// The row shape + stat catalog live in leagueLeadersCategories.ts (no
-// server-only imports) so the client board component can use them directly.
+// Server-only. League Leaders is built from player_season_stats — the
+// user's own Wyscout xlsx import (uploaded via /players/import), covering
+// the whole league — not mv_players_complete ("Nexus"), a separate
+// pre-aggregated dataset nothing here was ever uploaded into.
 import { createPsimServerClient } from "../supabase/psimServerClient";
 import type { LeagueLeaderRawRow } from "./leagueLeadersCategories";
 
 export type { LeagueLeaderRawRow } from "./leagueLeadersCategories";
 
-const PAGE_SIZE = 1000;
+const MIN_MINUTES = 50;
 
-/** Same 1000-row PostgREST cap as matchReportsBrowse.ts — match_event_locations alone is already past it. */
-async function fetchAllRows<T>(queryFactory: () => { range(from: number, to: number): PromiseLike<{ data: T[] | null; error: { message: string } | null }> }): Promise<T[]> {
-  const all: T[] = [];
-  let from = 0;
-  for (;;) {
-    const { data, error } = await queryFactory().range(from, from + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
-    const rows = (data ?? []) as T[];
-    all.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
-    from += PAGE_SIZE;
-  }
-  return all;
+interface SeasonStatsJson {
+  shots?: number | null;
+  shots_on_target_pct?: number | null;
+  yellow_cards?: number | null;
+  red_cards?: number | null;
+  key_passes_per_90?: number | null;
+  crosses_per_90?: number | null;
+  long_passes_per_90?: number | null;
+  progressive_passes_per_90?: number | null;
+  through_passes_per_90?: number | null;
+  interceptions_per_90?: number | null;
+  sliding_tackles_per_90?: number | null;
+  defensive_duels_won_pct?: number | null;
+  aerial_duels_won_pct?: number | null;
+  dribbles_per_90?: number | null;
+  successful_dribbles_pct?: number | null;
+  duels_won_pct?: number | null;
+  offensive_duels_per_90?: number | null;
+}
+
+interface RawRow {
+  player_id: number;
+  club_id: number;
+  matches_played: number;
+  minutes_played: number;
+  goals: number;
+  assists: number;
+  xg: number;
+  xa: number;
+  stats: SeasonStatsJson | null;
 }
 
 export async function fetchLeagueLeaders(): Promise<LeagueLeaderRawRow[]> {
   const supabase = createPsimServerClient();
 
-  const [{ data: players }, { data: clubs }, eventLocationRows, eventRows, passSummaryRows] = await Promise.all([
-    supabase.from("players").select("id, name, club_id, photo_url"),
+  const [{ data: seasonRows, error }, { data: players }, { data: clubs }] = await Promise.all([
+    supabase
+      .from("player_season_stats")
+      .select("player_id, club_id, matches_played, minutes_played, goals, assists, xg, xa, stats")
+      .gte("minutes_played", MIN_MINUTES),
+    supabase.from("players").select("id, name, photo_url"),
     supabase.from("clubs").select("id, name, logo_url"),
-    fetchAllRows<{ match_id: number; club_id: number; player_id: number | null; kind: string; outcome: string | null }>(() =>
-      supabase.from("match_event_locations").select("match_id, club_id, player_id, kind, outcome")
-    ),
-    fetchAllRows<{ match_id: number; club_id: number; player_id: number | null; event_type: string }>(() =>
-      supabase.from("match_events").select("match_id, club_id, player_id, event_type")
-    ),
-    fetchAllRows<{ match_id: number; player_id: number; total_passes: number | null }>(() =>
-      supabase.from("match_passing_summary").select("match_id, player_id, total_passes")
-    ),
   ]);
+  if (error) throw new Error(`player_season_stats query failed: ${error.message}`);
 
+  const playerById = new Map(((players ?? []) as { id: number; name: string; photo_url: string | null }[]).map((p) => [p.id, p]));
   const clubById = new Map(((clubs ?? []) as { id: number; name: string; logo_url: string | null }[]).map((c) => [c.id, c]));
 
-  interface Agg {
-    playerId: number;
-    name: string;
-    clubId: number;
-    photoUrl: string | null;
-    matches: Set<number>;
-    goals: number;
-    shots: number;
-    shotsOnTarget: number;
-    keyPasses: number;
-    crosses: number;
-    losses: number;
-    recoveries: number;
-    totalPasses: number;
-    yellowCards: number;
-    redCards: number;
-  }
-
-  const byPlayer = new Map<number, Agg>();
-  function entry(playerId: number, clubId: number): Agg {
-    let e = byPlayer.get(playerId);
-    if (!e) {
-      const p = (players ?? []).find((p) => p.id === playerId);
-      e = {
-        playerId,
-        name: p?.name ?? `Player #${playerId}`,
-        clubId,
-        photoUrl: p?.photo_url ?? null,
-        matches: new Set(),
-        goals: 0,
-        shots: 0,
-        shotsOnTarget: 0,
-        keyPasses: 0,
-        crosses: 0,
-        losses: 0,
-        recoveries: 0,
-        totalPasses: 0,
-        yellowCards: 0,
-        redCards: 0,
-      };
-      byPlayer.set(playerId, e);
-    }
-    return e;
-  }
-
-  for (const r of eventLocationRows) {
-    if (r.player_id === null) continue;
-    const e = entry(r.player_id, r.club_id);
-    e.matches.add(r.match_id);
-    if (r.kind === "shot") {
-      e.shots++;
-      if (r.outcome === "goal" || r.outcome === "on_target") e.shotsOnTarget++;
-    } else if (r.kind === "key_pass") e.keyPasses++;
-    else if (r.kind === "cross") e.crosses++;
-    else if (r.kind === "loss") e.losses++;
-    else if (r.kind === "recovery") e.recoveries++;
-  }
-
-  for (const r of eventRows) {
-    if (r.player_id === null) continue;
-    const e = entry(r.player_id, r.club_id);
-    e.matches.add(r.match_id);
-    if (r.event_type === "goal") e.goals++;
-    else if (r.event_type === "yellow_card") e.yellowCards++;
-    else if (r.event_type === "red_card") e.redCards++;
-  }
-
-  for (const r of passSummaryRows) {
-    const p = (players ?? []).find((p) => p.id === r.player_id);
-    if (!p) continue;
-    const e = entry(r.player_id, p.club_id);
-    e.matches.add(r.match_id);
-    e.totalPasses += r.total_passes ?? 0;
-  }
-
-  return [...byPlayer.values()].map((e) => ({
-    playerId: e.playerId,
-    name: e.name,
-    team: clubById.get(e.clubId)?.name ?? "Unknown",
-    logoUrl: clubById.get(e.clubId)?.logo_url ?? null,
-    photoUrl: e.photoUrl,
-    matchesInvolved: e.matches.size,
-    goals: e.goals,
-    shots: e.shots,
-    shotsOnTarget: e.shotsOnTarget,
-    keyPasses: e.keyPasses,
-    crosses: e.crosses,
-    losses: e.losses,
-    recoveries: e.recoveries,
-    totalPasses: e.totalPasses,
-    yellowCards: e.yellowCards,
-    redCards: e.redCards,
-  }));
+  return ((seasonRows ?? []) as RawRow[]).map((r) => {
+    const p = playerById.get(r.player_id);
+    const c = clubById.get(r.club_id);
+    const s = r.stats ?? {};
+    return {
+      playerId: r.player_id,
+      name: p?.name ?? `Player #${r.player_id}`,
+      team: c?.name ?? "Unknown",
+      logoUrl: c?.logo_url ?? null,
+      photoUrl: p?.photo_url ?? null,
+      matchesPlayed: r.matches_played,
+      minutesPlayed: r.minutes_played,
+      goals: r.goals,
+      assists: r.assists,
+      xg: r.xg,
+      xa: r.xa,
+      shots: s.shots ?? null,
+      shotsOnTargetPct: s.shots_on_target_pct ?? null,
+      yellowCards: s.yellow_cards ?? null,
+      redCards: s.red_cards ?? null,
+      keyPassesPer90: s.key_passes_per_90 ?? null,
+      crossesPer90: s.crosses_per_90 ?? null,
+      longPassesPer90: s.long_passes_per_90 ?? null,
+      progressivePassesPer90: s.progressive_passes_per_90 ?? null,
+      throughPassesPer90: s.through_passes_per_90 ?? null,
+      interceptionsPer90: s.interceptions_per_90 ?? null,
+      slidingTacklesPer90: s.sliding_tackles_per_90 ?? null,
+      defensiveDuelsWonPct: s.defensive_duels_won_pct ?? null,
+      aerialDuelsWonPct: s.aerial_duels_won_pct ?? null,
+      dribblesPer90: s.dribbles_per_90 ?? null,
+      successfulDribblesPct: s.successful_dribbles_pct ?? null,
+      duelsWonPct: s.duels_won_pct ?? null,
+      offensiveDuelsPer90: s.offensive_duels_per_90 ?? null,
+    };
+  });
 }

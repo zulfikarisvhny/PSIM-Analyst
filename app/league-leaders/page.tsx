@@ -11,7 +11,7 @@ export default async function LeagueLeadersPage() {
   return (
     <DashboardPageShell
       title="League Leaders"
-      description="Every player ranked by stat category — built from real imported match reports, so coverage grows as more are uploaded."
+      description="Every player ranked by stat category — from your own Wyscout player-stats import, not a third-party dataset. Minimum 50 minutes played."
     >
       <LeagueLeadersBoard players={players} />
     </DashboardPageShell>
