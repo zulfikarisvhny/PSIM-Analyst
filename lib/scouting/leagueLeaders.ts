@@ -4,11 +4,13 @@
 // the whole league — not mv_players_complete ("Nexus"), a separate
 // pre-aggregated dataset nothing here was ever uploaded into.
 import { createPsimServerClient } from "../supabase/psimServerClient";
-import type { LeagueLeaderRawRow } from "./leagueLeadersCategories";
+import { bucketPosition, type LeagueLeaderRawRow } from "./leagueLeadersCategories";
 
 export type { LeagueLeaderRawRow } from "./leagueLeadersCategories";
 
 interface SeasonStatsJson {
+  passport_country?: string | null;
+  birth_country?: string | null;
   shots?: number | null;
   non_penalty_goals?: number | null;
   head_goals?: number | null;
@@ -94,7 +96,9 @@ export async function fetchLeagueLeaders(): Promise<LeagueLeaderRawRow[]> {
       logoUrl: c?.logo_url ?? null,
       photoUrl: p?.photo_url ?? null,
       position: r.position,
+      positionBucket: bucketPosition(r.position),
       age: r.age,
+      isLocal: s.passport_country ? s.passport_country.includes("Indonesia") : s.birth_country ? s.birth_country.includes("Indonesia") : null,
       matchesPlayed: r.matches_played,
       minutesPlayed: r.minutes_played,
       goals: r.goals,

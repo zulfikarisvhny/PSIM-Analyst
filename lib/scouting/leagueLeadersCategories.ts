@@ -10,7 +10,9 @@ export interface LeagueLeaderRawRow {
   logoUrl: string | null;
   photoUrl: string | null;
   position: string | null;
+  positionBucket: string | null;
   age: number | null;
+  isLocal: boolean | null;
   matchesPlayed: number;
   minutesPlayed: number;
   goals: number;
@@ -65,6 +67,43 @@ export interface LeagueLeaderRawRow {
   aerialDuelsPer90: number | null;
   progressiveRunsPer90: number | null;
   accelerationsPer90: number | null;
+}
+
+// player_season_stats.position is Wyscout's own detailed code list, primary
+// position first (e.g. "LAMF, LWB, LW") — bucketed here, by the primary code
+// only, into the broad GK-through-CF groups the position picker shows.
+export const POSITION_BUCKETS = ["GK", "CB", "FB", "DM", "CM", "AM", "W", "CF"] as const;
+export type PositionBucket = (typeof POSITION_BUCKETS)[number];
+
+const BUCKET_BY_CODE: Record<string, PositionBucket> = {
+  GK: "GK",
+  CB: "CB",
+  LCB: "CB",
+  RCB: "CB",
+  LB: "FB",
+  RB: "FB",
+  LWB: "FB",
+  RWB: "FB",
+  DMF: "DM",
+  LDMF: "DM",
+  RDMF: "DM",
+  CMF: "CM",
+  LCMF: "CM",
+  RCMF: "CM",
+  AMF: "AM",
+  LAMF: "AM",
+  RAMF: "AM",
+  LW: "W",
+  RW: "W",
+  LWF: "W",
+  RWF: "W",
+  CF: "CF",
+};
+
+export function bucketPosition(rawPosition: string | null): PositionBucket | null {
+  if (!rawPosition) return null;
+  const primary = rawPosition.split(",")[0]?.trim();
+  return BUCKET_BY_CODE[primary] ?? null;
 }
 
 export type StatGroup = "Attacking" | "Creating" | "Passing" | "Defending" | "Dribbling & Duels" | "Goalkeeping" | "Discipline";
