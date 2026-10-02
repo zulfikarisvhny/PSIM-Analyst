@@ -214,7 +214,7 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
 
         <div className="border-t border-gray-100 pt-5">
           <p className="text-sm font-semibold text-[#121b2d] mb-2">Position</p>
-          <div className="flex flex-wrap gap-2">
+          <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${POSITION_BUCKETS.length + 1}, minmax(0, 1fr))` }}>
             <button
               type="button"
               onClick={() => setPositions(new Set())}
