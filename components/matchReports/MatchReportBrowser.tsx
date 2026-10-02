@@ -60,6 +60,7 @@ interface TeamPassNetwork {
 interface PlayerPhysicalStat {
   playerId: number;
   name: string;
+  photoUrl: string | null;
   totalDistanceM: number | null;
   highSpeedRunningM: number | null;
   sprintDistanceM: number | null;
@@ -775,7 +776,11 @@ export function MatchReportBrowser({ reports }: { reports: MatchReportDetail[] }
                               <div className="border-t border-gray-200 dark:border-[#2a2b30]" />
                               <div>
                                 <h4 className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-3">1st Half vs 2nd Half</h4>
-                                <PhysicalStatsHalfCompare firstHalf={report.psimPhysicalHalves.firstHalf} secondHalf={report.psimPhysicalHalves.secondHalf} />
+                                <PhysicalStatsHalfCompare
+                                  total={report.psimPhysicalStats ?? []}
+                                  firstHalf={report.psimPhysicalHalves.firstHalf}
+                                  secondHalf={report.psimPhysicalHalves.secondHalf}
+                                />
                               </div>
                             </>
                           )}

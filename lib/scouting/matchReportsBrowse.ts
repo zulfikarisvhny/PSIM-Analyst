@@ -120,6 +120,7 @@ export interface FormationLineupEntry {
 export interface PlayerPhysicalStat {
   playerId: number;
   name: string;
+  photoUrl: string | null;
   totalDistanceM: number | null;
   highSpeedRunningM: number | null;
   sprintDistanceM: number | null;
@@ -364,6 +365,7 @@ export async function fetchAllMatchReports(): Promise<MatchReportDetail[]> {
     const stat: PlayerPhysicalStat = {
       playerId: r.player_id,
       name: player.name,
+      photoUrl: player.photo_url,
       totalDistanceM: r.total_distance_m,
       highSpeedRunningM: r.high_speed_running_m,
       sprintDistanceM: r.sprint_distance_m,
