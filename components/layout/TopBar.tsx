@@ -26,6 +26,9 @@ function titleFor(pathname: string): { eyebrow: string; title: string } {
     const team = decodeURIComponent(pathname.slice("/scouting/".length));
     return { eyebrow: "Scouting", title: team || "Team" };
   }
+  if (pathname.startsWith("/players/")) {
+    return { eyebrow: "Squad", title: "Player Profile" };
+  }
   return { eyebrow: "PSIM Intelligence Dashboard", title: "" };
 }
 

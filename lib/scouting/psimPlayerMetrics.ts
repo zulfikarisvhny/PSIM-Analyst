@@ -1,4 +1,6 @@
 // lib/scouting/psimPlayerMetrics.ts
+import { PsimPlayerRow, percentileRank, getMetricValue } from "./psimPlayerTypes";
+
 // Position buckets + per-bucket "what to compare" for the PSIM player_season_stats
 // table. Verified directly against the live schema: matches_played, minutes_played,
 // goals, xg, assists, xa, age, position are top-level columns; everything else
@@ -226,3 +228,48 @@ export const BUCKET_METRIC_GROUPS: Record<string, MetricGroup[]> = {
     },
   ],
 };
+
+export interface ComputedMetric {
+  key: string;
+  label: string;
+  value: number;
+  decimals: number;
+  suffix?: string;
+  percentile: number;
+}
+
+export interface ComputedGroup {
+  title: string;
+  color: { light: string; dark: string };
+  items: ComputedMetric[];
+}
+
+/** Buckets `player` by position, filters `leaguePool` down to the same bucket, and
+ * computes per-metric percentiles against that pool — the shared logic behind
+ * both the stat-row breakdown and the radar chart on a player's profile page. */
+export function computePlayerComparison(player: PsimPlayerRow, leaguePool: PsimPlayerRow[]) {
+  const bucket = positionBucketOf(player.position);
+  const positions = bucket ? WYSCOUT_POSITION_BUCKETS[bucket] ?? [] : [];
+  const pool = leaguePool.filter((r) => positions.includes((r.position ?? "").split(",")[0].trim().toUpperCase()));
+  const groups = bucket ? BUCKET_METRIC_GROUPS[bucket] ?? [] : [];
+
+  const computedGroups: ComputedGroup[] = groups.map((group) => ({
+    title: group.title,
+    color: group.color,
+    items: group.metrics.map((metric) => {
+      const value = getMetricValue(player, metric.key) ?? 0;
+      const poolValues = pool.map((r) => getMetricValue(r, metric.key)).filter((v): v is number => v !== null);
+      const rawPercentile = percentileRank(poolValues, value);
+      return {
+        key: metric.key,
+        label: metric.label,
+        value,
+        decimals: metric.decimals,
+        suffix: metric.suffix,
+        percentile: metric.invert ? 100 - rawPercentile : rawPercentile,
+      };
+    }),
+  }));
+
+  return { bucket, pool, groups, computedGroups };
+}

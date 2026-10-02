@@ -10,6 +10,7 @@ export type { PsimPlayerRow } from "./psimPlayerTypes";
 export { percentileRank, getMetricValue } from "./psimPlayerTypes";
 
 interface RawRow {
+  player_id: number;
   position: string | null;
   age: number | null;
   matches_played: number | null;
@@ -38,10 +39,11 @@ export async function fetchPsimPlayerPool(): Promise<PsimPlayerRow[]> {
   const supabase = createPsimServerClient();
   const { data, error } = await supabase
     .from("player_season_stats")
-    .select("position, age, matches_played, minutes_played, goals, assists, xg, xa, stats, players(name, photo_url), clubs(name)");
+    .select("player_id, position, age, matches_played, minutes_played, goals, assists, xg, xa, stats, players(name, photo_url), clubs(name)");
   if (error) throw new Error(`player_season_stats query failed: ${error.message}`);
 
   return ((data ?? []) as unknown as RawRow[]).map((row) => ({
+    playerId: row.player_id,
     player: firstPlayer(row.players).name,
     team: firstName(row.clubs),
     photoUrl: firstPlayer(row.players).photo_url,

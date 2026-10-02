@@ -32,7 +32,7 @@ export default async function PlayersPage() {
         <div className={`${shell.card} p-5 text-sm text-gray-500`}>No players found for {PSIM} in player_season_stats yet.</div>
       )}
 
-      {teamPlayers.length > 0 && <PlayerBrowser players={teamPlayers} leaguePool={pool} />}
+      {teamPlayers.length > 0 && <PlayerBrowser players={teamPlayers} />}
     </DashboardPageShell>
   );
 }

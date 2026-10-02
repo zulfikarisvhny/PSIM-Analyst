@@ -4,6 +4,7 @@
 // createPsimServerClient) so client components can import these without
 // pulling a server-only module into the browser bundle.
 export interface PsimPlayerRow {
+  playerId: number;
   player: string;
   team: string;
   photoUrl: string | null;

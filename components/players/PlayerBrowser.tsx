@@ -1,13 +1,12 @@
 // components/players/PlayerBrowser.tsx
 "use client";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { PsimPlayerRow } from "@/lib/scouting/psimPlayerTypes";
 import { positionBucketOf } from "@/lib/scouting/psimPlayerMetrics";
-import { PlayerDetailModal } from "./PlayerDetailModal";
 
-export function PlayerBrowser({ players, leaguePool }: { players: PsimPlayerRow[]; leaguePool: PsimPlayerRow[] }) {
+export function PlayerBrowser({ players }: { players: PsimPlayerRow[] }) {
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<PsimPlayerRow | null>(null);
 
   const filtered = useMemo(
     () => players.filter((p) => p.player.toLowerCase().includes(query.toLowerCase())),
@@ -28,9 +27,9 @@ export function PlayerBrowser({ players, leaguePool }: { players: PsimPlayerRow[
         {filtered.map((p) => {
           const bucket = positionBucketOf(p.position);
           return (
-            <button
-              key={p.player}
-              onClick={() => setSelected(p)}
+            <Link
+              key={p.playerId}
+              href={`/players/${p.playerId}`}
               className="text-left bg-white dark:bg-[#191a1d] border border-gray-200 dark:border-[#2a2b30] rounded-lg p-4 hover:border-blue-400 dark:hover:border-[#ffcf4d] transition-colors flex items-center gap-3"
             >
               {p.photoUrl ? (
@@ -50,14 +49,12 @@ export function PlayerBrowser({ players, leaguePool }: { players: PsimPlayerRow[
                   {p.matches_played ?? 0} apps · {p.minutes_played ?? 0}&apos; · {p.goals ?? 0}g · {p.assists ?? 0}a
                 </div>
               </div>
-            </button>
+            </Link>
           );
         })}
       </div>
 
       {filtered.length === 0 && <p className="text-sm text-gray-500 dark:text-gray-400">No players found.</p>}
-
-      <PlayerDetailModal player={selected} leaguePool={leaguePool} onClose={() => setSelected(null)} />
     </div>
   );
 }
