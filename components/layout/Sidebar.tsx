@@ -84,6 +84,7 @@ const MAIN_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: IconHome },
   { href: "/opponent-analysis", label: "Opponent Analyst", icon: IconSearch, activePrefixes: ["/scouting"] },
   { href: "/players", label: "Players", icon: IconUsers },
+  { href: "/league-leaders", label: "League Leaders", icon: IconChart },
   { href: "/schedule", label: "Schedule", icon: IconCalendar },
 ];
 

@@ -9,6 +9,7 @@ const ROUTE_TITLES: Record<string, { eyebrow: string; title: string }> = {
   "/": { eyebrow: "PSIM Yogyakarta", title: "Dashboard" },
   "/opponent-analysis": { eyebrow: "Scouting", title: "Opponent Analysis" },
   "/players": { eyebrow: "Squad", title: "Players" },
+  "/league-leaders": { eyebrow: "League", title: "League Leaders" },
   "/players/import": { eyebrow: "Import Data", title: "Player Stats" },
   "/schedule": { eyebrow: "PSIM Yogyakarta", title: "Schedule" },
   "/match-reports/import": { eyebrow: "Import Data", title: "Match Reports" },
