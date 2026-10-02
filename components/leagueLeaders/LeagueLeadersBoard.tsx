@@ -22,6 +22,8 @@ const AXIS_PAD_TOP = 10;
 
 const selectClass = "bg-white border border-gray-200 rounded-md px-2 py-1.5 text-xs font-semibold text-gray-700";
 
+const PSIM = "PSIM Yogyakarta";
+
 type Nationality = "all" | "local" | "foreign";
 
 /** Two overlapping native range inputs sharing one track — the standard dependency-free dual-handle slider. */
@@ -136,7 +138,7 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
       const stack = binHeights[bin]++;
       const x = (bin / BIN_COUNT) * plotWidth + (plotWidth / BIN_COUNT) * 0.5;
       const y = CHART_HEIGHT - AXIS_PAD_BOTTOM - stack * (DOT_R * 2 + DOT_GAP) - DOT_R;
-      return { id: r.player.playerId, x, y, isTop10: top10Ids.has(r.player.playerId) };
+      return { id: r.player.playerId, x, y, isTop10: top10Ids.has(r.player.playerId), isPsim: r.player.team === PSIM, name: r.player.name };
     });
   }, [ranked, binWidth, top10Ids]);
 
@@ -256,7 +258,12 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
           <div className="flex flex-col gap-6">
             <div>
               <p className="text-[10px] font-bold tracking-wider text-gray-400 uppercase mb-1">The field</p>
-              <h3 className="text-xl font-extrabold text-[#121b2d] mb-3">Where the ten sit.</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                <h3 className="text-xl font-extrabold text-[#121b2d]">Where the ten sit.</h3>
+                <span className="flex items-center gap-1.5 text-[11px] text-gray-500">
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-600 inline-block" /> PSIM Yogyakarta
+                </span>
+              </div>
               <div className="overflow-x-auto">
                 <svg viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`} width="100%" height={CHART_HEIGHT} className="min-w-[500px]">
                   {/* Median line */}
@@ -273,9 +280,19 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
                     Median {median.toFixed(category.decimals)}
                   </text>
 
-                  {/* Dots: the whole field in light gray, top 10 in dark */}
+                  {/* Dots: the whole field in light gray, top 10 in dark, PSIM players ringed in blue regardless */}
                   {dots.map((d) => (
-                    <circle key={d.id} cx={d.x} cy={d.y} r={DOT_R} fill={d.isTop10 ? "#121b2d" : "#d9dce3"} />
+                    <circle
+                      key={d.id}
+                      cx={d.x}
+                      cy={d.y}
+                      r={d.isPsim ? DOT_R + 0.8 : DOT_R}
+                      fill={d.isTop10 ? "#121b2d" : d.isPsim ? "#2f63d4" : "#d9dce3"}
+                      stroke={d.isPsim ? "#2f63d4" : "none"}
+                      strokeWidth={d.isPsim ? 1.2 : 0}
+                    >
+                      <title>{d.name}</title>
+                    </circle>
                   ))}
 
                   {/* Axis */}
@@ -295,28 +312,68 @@ export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] 
                 {top10[0].player.name.split(" ").slice(-1)[0]} leads the league.
               </h3>
               <div className="flex flex-col divide-y divide-gray-100">
-                {top10.map((r, i) => (
-                  <div key={r.player.playerId} className={`flex items-center gap-3 py-2.5 ${i === 0 ? "bg-blue-50 -mx-3 px-3 rounded-lg" : ""}`}>
-                    <span className={`w-5 text-sm font-bold shrink-0 ${i === 0 ? "text-blue-700" : "text-gray-400"}`}>{i + 1}</span>
-                    {r.player.logoUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={r.player.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />
-                    ) : (
-                      <span className="w-6 h-6 rounded-full bg-gray-100 shrink-0" />
-                    )}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#121b2d] truncate">{r.player.name}</p>
-                      <p className="text-[11px] text-gray-500 truncate">
-                        {r.player.team}
-                        {r.player.positionBucket ? ` · ${r.player.positionBucket}` : ""}
-                        {r.player.age !== null ? ` · ${r.player.age}y` : ""}
-                        {i === 0 && top10.length > 1 ? ` · ${(r.value - top10[1].value).toFixed(category.decimals)} clear of ${top10[1].player.name}` : ""}
-                      </p>
+                {top10.map((r, i) => {
+                  const isPsim = r.player.team === PSIM;
+                  const highlight = i === 0 || isPsim;
+                  return (
+                    <div key={r.player.playerId} className={`flex items-center gap-3 py-2.5 ${highlight ? "bg-blue-50 -mx-3 px-3 rounded-lg" : ""}`}>
+                      <span className={`w-5 text-sm font-bold shrink-0 ${highlight ? "text-blue-700" : "text-gray-400"}`}>{i + 1}</span>
+                      {r.player.logoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={r.player.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />
+                      ) : (
+                        <span className="w-6 h-6 rounded-full bg-gray-100 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-[#121b2d] truncate flex items-center gap-1.5">
+                          <span className="truncate">{r.player.name}</span>
+                          {isPsim && <span className="text-[9px] font-bold text-blue-700 bg-blue-100 rounded px-1 py-0.5 shrink-0">PSIM</span>}
+                        </p>
+                        <p className="text-[11px] text-gray-500 truncate">
+                          {r.player.team}
+                          {r.player.positionBucket ? ` · ${r.player.positionBucket}` : ""}
+                          {r.player.age !== null ? ` · ${r.player.age}y` : ""}
+                          {i === 0 && top10.length > 1 ? ` · ${(r.value - top10[1].value).toFixed(category.decimals)} clear of ${top10[1].player.name}` : ""}
+                        </p>
+                      </div>
+                      <span className="text-base font-bold text-[#121b2d] shrink-0">{fmt(r.value, category.decimals, category.suffix)}</span>
                     </div>
-                    <span className="text-base font-bold text-[#121b2d] shrink-0">{fmt(r.value, category.decimals, category.suffix)}</span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
+
+              {(() => {
+                const psimOutside = ranked
+                  .map((r, i) => ({ ...r, rank: i + 1 }))
+                  .filter((r) => r.player.team === PSIM && !top10Ids.has(r.player.playerId));
+                if (psimOutside.length === 0) return null;
+                return (
+                  <div className="mt-4 pt-4 border-t border-dashed border-blue-200">
+                    <p className="text-[10px] font-bold tracking-wider text-blue-600 uppercase mb-2">PSIM Yogyakarta in the field</p>
+                    <div className="flex flex-col divide-y divide-gray-100">
+                      {psimOutside.map((r) => (
+                        <div key={r.player.playerId} className="flex items-center gap-3 py-2">
+                          <span className="w-9 text-sm font-bold text-blue-600 shrink-0">#{r.rank}</span>
+                          {r.player.logoUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={r.player.logoUrl} alt="" className="w-6 h-6 object-contain shrink-0" />
+                          ) : (
+                            <span className="w-6 h-6 rounded-full bg-gray-100 shrink-0" />
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-[#121b2d] truncate">{r.player.name}</p>
+                            <p className="text-[11px] text-gray-500 truncate">
+                              {r.player.positionBucket ?? ""}
+                              {r.player.age !== null ? ` · ${r.player.age}y` : ""}
+                            </p>
+                          </div>
+                          <span className="text-base font-bold text-[#121b2d] shrink-0">{fmt(r.value, category.decimals, category.suffix)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             <p className="text-[11px] text-gray-400">{ranked.length} players ranked.</p>
