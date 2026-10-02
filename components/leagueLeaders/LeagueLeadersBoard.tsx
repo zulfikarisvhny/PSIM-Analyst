@@ -1,13 +1,9 @@
 // components/leagueLeaders/LeagueLeadersBoard.tsx
 "use client";
 import { useMemo, useState } from "react";
-import { STAT_CATEGORIES, type LeagueLeaderRawRow, type StatGroup } from "@/lib/scouting/leagueLeaders";
+import { STAT_CATEGORIES, type LeagueLeaderRawRow, type StatGroup } from "@/lib/scouting/leagueLeadersCategories";
 
-const GROUPS: StatGroup[] = ["Attacking", "Passing & Creativity", "Defending", "Dribbling & Duels"];
-
-interface PlayerWithLogo extends LeagueLeaderRawRow {
-  logoUrl: string | null;
-}
+const GROUPS: StatGroup[] = ["Attacking", "Passing", "Defending", "Discipline"];
 
 function fmt(v: number, decimals: number, suffix?: string): string {
   return `${v.toFixed(decimals)}${suffix ?? ""}`;
@@ -24,14 +20,14 @@ const CHART_HEIGHT = 220;
 const AXIS_PAD_BOTTOM = 28;
 const AXIS_PAD_TOP = 10;
 
-export function LeagueLeadersBoard({ players }: { players: PlayerWithLogo[] }) {
+export function LeagueLeadersBoard({ players }: { players: LeagueLeaderRawRow[] }) {
   const [categoryKey, setCategoryKey] = useState(STAT_CATEGORIES[0].key);
   const category = STAT_CATEGORIES.find((c) => c.key === categoryKey)!;
 
   const ranked = useMemo(() => {
     return players
       .map((p) => ({ player: p, value: category.compute(p) }))
-      .filter((r): r is { player: PlayerWithLogo; value: number } => r.value !== null)
+      .filter((r): r is { player: LeagueLeaderRawRow; value: number } => r.value !== null && r.value > 0)
       .sort((a, b) => b.value - a.value);
   }, [players, category]);
 
