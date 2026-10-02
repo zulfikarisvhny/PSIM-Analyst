@@ -67,6 +67,11 @@ export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "re
     for (const e of selectedEvents) byPlayer.set(e.playerName, (byPlayer.get(e.playerName) ?? 0) + 1);
     return [...byPlayer.entries()].sort((a, b) => b[1] - a[1]);
   })();
+  const topPlayers = (() => {
+    const byPlayer = new Map<string, number>();
+    for (const e of events) byPlayer.set(e.playerName, (byPlayer.get(e.playerName) ?? 0) + 1);
+    return [...byPlayer.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+  })();
 
   function fmt(n: number): string {
     return divisor === 1 ? String(n) : (n / divisor).toFixed(1);
@@ -145,6 +150,23 @@ export function TeamZoneMap({ kind, events, matchesCount }: { kind: "loss" | "re
               </circle>
             ))}
         </svg>
+      </div>
+
+      <div className="max-w-2xl mx-auto mt-3">
+        <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5">Top 5 players</p>
+        <div className="flex flex-col gap-1">
+          {topPlayers.map(([name, count], i) => (
+            <div key={name} className="flex items-center gap-2 text-[11px]">
+              <span className="w-4 h-4 shrink-0 rounded-full bg-gray-100 dark:bg-[#2a2b30] text-gray-500 dark:text-gray-400 flex items-center justify-center text-[9px] font-bold">
+                {i + 1}
+              </span>
+              <span className="text-gray-700 dark:text-gray-200 truncate flex-1">{name}</span>
+              <span className="font-semibold text-gray-900 dark:text-white shrink-0">
+                {fmt(count)} {kind === "loss" ? "losses" : "recoveries"}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
 
       {selected && (
