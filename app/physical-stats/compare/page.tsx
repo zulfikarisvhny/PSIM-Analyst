@@ -46,7 +46,6 @@ export default async function PhysicalStatsComparePage({
   return (
     <DashboardPageShell
       title="Compare Training GPS"
-      maxWidthClassName="max-w-4xl"
       description="Pick two imported sessions and compare player-by-player and team-average GPS output, overall or for one matched drill/period."
     >
       {sessions.length === 0 ? (

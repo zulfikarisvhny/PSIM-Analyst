@@ -7,7 +7,6 @@ export default function PlayersImportPage() {
   return (
     <DashboardPageShell
       title="Update Player Stats"
-      maxWidthClassName="max-w-5xl"
       description={
         <>
           Upload the weekly Wyscout player-search export (whole league). Existing players (matched by name + club) get

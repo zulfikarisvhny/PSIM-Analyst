@@ -19,7 +19,6 @@ export default async function SeasonComparisonPage() {
   return (
     <DashboardPageShell
       title="Season Comparison"
-      maxWidthClassName="max-w-4xl"
       description="PSIM Yogyakarta — 2026/2027 so far vs the full 2025/2026 season."
     >
       {lastSeason && (

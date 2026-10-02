@@ -8,7 +8,7 @@ import shell from "./DashboardShell.module.css";
 
 export function DashboardPageShell({
   description,
-  maxWidthClassName = "max-w-2xl",
+  maxWidthClassName = "max-w-[1500px]",
   children,
 }: {
   title: string;
@@ -18,7 +18,7 @@ export function DashboardPageShell({
 }) {
   return (
     <main className={shell.page}>
-      <div className={`relative z-[1] ${maxWidthClassName} mx-auto px-4 py-10`}>
+      <div className={`relative z-[1] ${maxWidthClassName} mx-auto px-3 sm:px-6 py-10`}>
         {description && <p className="text-sm text-gray-500 mb-6">{description}</p>}
         {children}
       </div>

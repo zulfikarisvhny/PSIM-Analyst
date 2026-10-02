@@ -20,7 +20,6 @@ export default async function PlayersPage() {
   return (
     <DashboardPageShell
       title="Player Profiles"
-      maxWidthClassName="max-w-5xl"
       description="PSIM Yogyakarta squad, compared per-position against the league-wide pool. Click a player for the full breakdown."
     >
       {error && (

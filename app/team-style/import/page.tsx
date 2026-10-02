@@ -7,7 +7,6 @@ export default function TeamStyleImportPage() {
   return (
     <DashboardPageShell
       title="Import Team Style Stats"
-      maxWidthClassName="max-w-4xl"
       description={
         <>
           Upload a Wyscout &quot;Team Stats&quot; xlsx export. Every team found in the file gets its matches averaged

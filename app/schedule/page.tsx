@@ -9,7 +9,7 @@ export default async function SchedulePage() {
   const data = await fetchSchedule(PSIM);
 
   return (
-    <DashboardPageShell title="Schedule" maxWidthClassName="max-w-5xl" description="PSIM Yogyakarta — training sessions and match days. Click a date for details.">
+    <DashboardPageShell title="Schedule" description="PSIM Yogyakarta — training sessions and match days. Click a date for details.">
       <FullScheduleCalendar data={data} />
     </DashboardPageShell>
   );
