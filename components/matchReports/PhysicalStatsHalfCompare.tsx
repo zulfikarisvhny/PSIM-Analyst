@@ -81,12 +81,20 @@ export function PhysicalStatsHalfCompare({
   // A player who was subbed partway through a half (or didn't feature in it
   // at all) naturally posts a lower number there — flagging that so a
   // shorter bar doesn't read as "dropped off" when they just played less.
-  // Catapult's own per-half minutesPlayed is the giveaway: a full XI of
-  // starters sets the half's true length, and anyone well short of that
-  // either came on late or went off early.
+  // Catapult's own per-half minutesPlayed can't be trusted for this: the
+  // vest logs the recording window's full length regardless of when the
+  // player actually came off, so a sub at minute 67 still shows ~49 played
+  // minutes for "2nd Half". The match's real substitution events (exact
+  // minute) are the source of truth when present; the minutes heuristic is
+  // only a fallback for reports with no substitution data at all.
   const firstHalfLength = Math.max(0, ...firstHalf.map((p) => p.minutesPlayed ?? 0));
   const secondHalfLength = Math.max(0, ...secondHalf.map((p) => p.minutesPlayed ?? 0));
-  const isPartial = (minutes: number | null | undefined, halfLength: number) => halfLength > 0 && (minutes === null || minutes === undefined || minutes < halfLength * 0.85);
+  const isPartialByMinutes = (minutes: number | null | undefined, halfLength: number) =>
+    halfLength > 0 && (minutes === null || minutes === undefined || minutes < halfLength * 0.85);
+  function subMinuteNum(minute: string): number {
+    const m = minute.match(/^(\d+)/);
+    return m ? Number(m[1]) : 0;
+  }
 
   const rows = playerIds
     .map((id) => {
@@ -98,6 +106,9 @@ export function PhysicalStatsHalfCompare({
       const delta = aVal !== null && bVal !== null ? bVal - aVal : null;
       const good = delta !== null && (higherIsBetter ? delta > 0 : delta < 0);
       const bad = delta !== null && (higherIsBetter ? delta < 0 : delta > 0);
+      const sub = subByPlayerId.get(id) ?? null;
+      const subInFirstHalf = sub !== null && subMinuteNum(sub.minute) <= 45;
+      const subInSecondHalf = sub !== null && subMinuteNum(sub.minute) > 45;
       return {
         id,
         name: t?.name ?? a?.name ?? b?.name ?? `Player #${id}`,
@@ -108,11 +119,11 @@ export function PhysicalStatsHalfCompare({
         delta,
         good,
         bad,
-        aPartial: isPartial(a?.minutesPlayed, firstHalfLength),
-        bPartial: isPartial(b?.minutesPlayed, secondHalfLength),
+        aPartial: sub ? subInFirstHalf : isPartialByMinutes(a?.minutesPlayed, firstHalfLength),
+        bPartial: sub ? subInSecondHalf : isPartialByMinutes(b?.minutesPlayed, secondHalfLength),
         aMinutes: a?.minutesPlayed ?? null,
         bMinutes: b?.minutesPlayed ?? null,
-        sub: subByPlayerId.get(id) ?? null,
+        sub,
       };
     })
     .filter((r) => r.aVal !== null || r.bVal !== null)
