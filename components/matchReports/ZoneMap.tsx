@@ -173,8 +173,8 @@ export function TeamZoneMap({
         </svg>
       </div>
 
-      <div className="max-w-2xl mx-auto mt-3 grid grid-cols-1 sm:grid-cols-2 gap-6">
-        <div>
+      <div className="max-w-2xl mx-auto mt-3 grid grid-cols-1 sm:grid-cols-2 sm:divide-x sm:divide-gray-200 dark:sm:divide-[#2a2b30]">
+        <div className="sm:pr-6">
           <div className="flex items-center justify-between mb-1.5">
             <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200">
               {selected ? `Top ${topPlayers.length} — Zone ${selected.col * ROWS + selected.row + 1}` : `Top ${topPlayers.length} players`}
@@ -192,9 +192,9 @@ export function TeamZoneMap({
           {topPlayers.length === 0 ? (
             <p className="text-[11px] text-gray-400">No events in this zone.</p>
           ) : (
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col divide-y divide-gray-100 dark:divide-[#2a2b30]">
               {topPlayers.map((p, i) => (
-                <div key={p.name} className="flex items-center gap-2 text-[11px]">
+                <div key={p.name} className="flex items-center gap-2 text-[11px] py-1.5 first:pt-0 last:pb-0">
                   <span className="w-4 h-4 shrink-0 rounded-full bg-gray-100 dark:bg-[#2a2b30] text-gray-500 dark:text-gray-400 flex items-center justify-center text-[9px] font-bold">
                     {i + 1}
                   </span>
@@ -204,8 +204,8 @@ export function TeamZoneMap({
                   ) : (
                     <span className="w-5 h-5 rounded-full bg-gray-100 dark:bg-[#2a2b30] shrink-0" />
                   )}
-                  <span className="text-gray-700 dark:text-gray-200 truncate flex-1">{p.name}</span>
-                  <span className="text-gray-900 dark:text-white shrink-0">{fmt(p.count)}</span>
+                  <span className="text-gray-700 dark:text-gray-200 truncate">{p.name}</span>
+                  <span className="text-gray-900 dark:text-white shrink-0 ml-3">{fmt(p.count)}</span>
                 </div>
               ))}
             </div>
@@ -213,11 +213,11 @@ export function TeamZoneMap({
         </div>
 
         {typeBreakdown && typeBreakdown.some((t) => t.count !== null) && (
-          <div>
+          <div className="mt-6 sm:mt-0 sm:pl-6">
             <p className="text-[11px] font-semibold text-gray-700 dark:text-gray-200 mb-1.5">{kind === "loss" ? "Losses type" : "Recoveries type"}</p>
-            <div className="flex flex-col gap-1">
+            <div className="flex flex-col divide-y divide-gray-100 dark:divide-[#2a2b30]">
               {typeBreakdown.map((t) => (
-                <div key={t.label} className="flex items-center justify-between text-[11px]">
+                <div key={t.label} className="flex items-center justify-between text-[11px] py-1.5 first:pt-0 last:pb-0">
                   <span className="text-gray-700 dark:text-gray-200 truncate">{t.label}</span>
                   <span className="text-gray-900 dark:text-white shrink-0 ml-2">{t.count ?? "—"}</span>
                 </div>
